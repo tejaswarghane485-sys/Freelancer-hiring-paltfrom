@@ -2,8 +2,7 @@
    API Layer — all application data comes from the Spring Boot API
    ============================================================ */
 
-co(window.API_BASE_URL || 'https://freelancer-hiring-paltfrom-production.up.railway.app/api').replace(/\/+$/, '');
-
+const API BASE = '/api';
 async function apiCall(endpoint, options = {}) {
     const token = sessionStorage.getItem('token');
     const headers = {

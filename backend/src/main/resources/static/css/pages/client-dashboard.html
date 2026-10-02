@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Dashboard - FreelanceHub</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+</head>
+<body class="app-body">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <span class="brand-icon">⚡</span>
+            <span class="brand-name">FreelanceHub</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-section="overview">
+                <span class="nav-icon">📊</span> Overview
+            </a>
+            <a href="#" class="nav-item" data-section="post-project">
+                <span class="nav-icon">➕</span> Post Project
+            </a>
+            <a href="#" class="nav-item" data-section="my-projects">
+                <span class="nav-icon">📁</span> My Projects
+            </a>
+            <a href="#" class="nav-item" data-section="freelancers">
+                <span class="nav-icon">👥</span> Browse Freelancers
+            </a>
+            <a href="#" class="nav-item" data-section="proposals">
+                <span class="nav-icon">📝</span> View Proposals
+            </a>
+            <a href="#" class="nav-item" data-section="hiring">
+                <span class="nav-icon">🤝</span> Hiring Requests
+                <span class="nav-badge hidden" id="hiringBadge">0</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="sidebarAvatar">C</div>
+                <div>
+                    <div class="user-name" id="sidebarName">Client</div>
+                    <div class="user-role-label">Client</div>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="logout()">⇦ Logout</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="topbar">
+            <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">☰</button>
+            <h1 class="page-title" id="pageTitle">Overview</h1>
+            <div class="topbar-right">
+                <span class="welcome-text">Welcome, <strong id="topbarName">Client</strong></span>
+            </div>
+        </header>
+
+        <!-- ── OVERVIEW ── -->
+        <section class="content-section active" id="section-overview">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📁</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalProjects">–</div>
+                        <div class="stat-label">Total Projects</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🟢</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="openProjects">–</div>
+                        <div class="stat-label">Open Projects</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔄</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="inProgressProjects">–</div>
+                        <div class="stat-label">In Progress</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🤝</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalHiring">–</div>
+                        <div class="stat-label">Hiring Requests Sent</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="card-header">
+                    <h2>Recent Projects</h2>
+                    <button class="btn btn-primary btn-sm" onclick="showSection('post-project')">＋ New Project</button>
+                </div>
+                <div id="recentProjectsList" class="projects-list">
+                    <div class="skeleton-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── POST PROJECT ── -->
+        <section class="content-section" id="section-post-project">
+            <div class="section-card">
+                <div class="card-header">
+                    <h2>Post a New Project</h2>
+                </div>
+                <div id="projectFormAlert" class="alert hidden"></div>
+                <form id="projectForm" class="form-layout">
+                    <div class="form-group">
+                        <label for="projTitle">Project Title *</label>
+                        <input type="text" id="projTitle" placeholder="e.g. Build an E-Commerce Website" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="projDesc">Project Description *</label>
+                        <textarea id="projDesc" rows="5" placeholder="Describe what you need in detail..." required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="projSkills">Required Skills</label>
+                            <input type="text" id="projSkills" placeholder="e.g. React, Node.js, MySQL">
+                        </div>
+                        <div class="form-group">
+                            <label for="projBudget">Budget (₹)</label>
+                            <input type="number" id="projBudget" placeholder="e.g. 5000" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="projDeadline">Deadline</label>
+                        <input type="date" id="projDeadline">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="postProjectBtn">Post Project</button>
+                        <button type="reset" class="btn btn-outline">Clear</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ── MY PROJECTS ── -->
+        <section class="content-section" id="section-my-projects">
+            <div class="section-card">
+                <div class="card-header">
+                    <h2>My Projects</h2>
+                    <button class="btn btn-primary btn-sm" onclick="showSection('post-project')">＋ Post New</button>
+                </div>
+                <div id="myProjectsList" class="projects-list">
+                    <div class="skeleton-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── BROWSE FREELANCERS ── -->
+        <section class="content-section" id="section-freelancers">
+            <div class="section-card">
+                <div class="card-header"><h2>Browse Freelancers</h2></div>
+                <div class="search-bar">
+                    <input type="text" id="freelancerSearch" placeholder="Search by skill or name..." aria-label="Search freelancers">
+                    <button class="btn btn-primary" onclick="searchFreelancers()">Search</button>
+                    <button class="btn btn-outline" onclick="loadAllFreelancers()">All</button>
+                </div>
+                <div id="freelancersList" class="freelancers-grid">
+                    <div class="skeleton-grid"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── PROPOSALS ── -->
+        <section class="content-section" id="section-proposals">
+            <div class="section-card">
+                <div class="card-header"><h2>View Proposals</h2></div>
+                <div class="form-group" style="max-width:420px">
+                    <label for="proposalProjectSelect">Select Project</label>
+                    <select id="proposalProjectSelect" onchange="loadProposalsForProject(this.value)">
+                        <option value="">-- Select a project --</option>
+                    </select>
+                </div>
+                <div id="proposalsList" class="proposals-list"></div>
+            </div>
+        </section>
+
+        <!-- ── HIRING REQUESTS ── -->
+        <section class="content-section" id="section-hiring">
+            <div class="section-card">
+                <div class="card-header"><h2>Hiring Requests Sent</h2></div>
+                <div id="hiringList" class="proposals-list">
+                    <div class="skeleton-list"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ══ MODAL: Freelancer Detail + Hire ══ -->
+    <div class="modal-overlay hidden" id="freelancerModal" role="dialog" aria-modal="true" aria-labelledby="fModalTitle">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('freelancerModal')" aria-label="Close">✕</button>
+            <div id="freelancerModalContent"></div>
+        </div>
+    </div>
+
+    <!-- ══ MODAL: Edit Project ══ -->
+    <div class="modal-overlay hidden" id="editProjectModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('editProjectModal')" aria-label="Close">✕</button>
+            <h2 id="editModalTitle" style="margin-bottom:20px">Edit Project</h2>
+            <div id="editProjectAlert" class="alert hidden"></div>
+            <form id="editProjectForm" class="form-layout">
+                <input type="hidden" id="editProjectId">
+                <div class="form-group">
+                    <label for="editProjTitle">Project Title *</label>
+                    <input type="text" id="editProjTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="editProjDesc">Description *</label>
+                    <textarea id="editProjDesc" rows="4" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editProjSkills">Required Skills</label>
+                        <input type="text" id="editProjSkills">
+                    </div>
+                    <div class="form-group">
+                        <label for="editProjBudget">Budget (₹)</label>
+                        <input type="number" id="editProjBudget" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editProjDeadline">Deadline</label>
+                    <input type="date" id="editProjDeadline">
+                </div>
+                <div class="form-group">
+                    <label for="editProjectStatus">Status</label>
+                    <select id="editProjectStatus">
+                        <option value="OPEN">OPEN</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="editProjectBtn">Save Changes</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editProjectModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/dashboard.js"></script>
+    <script src="../js/client.js"></script>
+</body>
+</html>
