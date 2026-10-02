@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - FreelanceHub</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/auth.css">
+    <style>
+        /* Password strength meter */
+        .strength-bar-wrap {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .strength-seg {
+            flex: 1;
+            height: 4px;
+            border-radius: 999px;
+            background: var(--gray-200);
+            transition: background 0.3s ease;
+        }
+        .strength-seg.weak   { background: var(--danger); }
+        .strength-seg.fair   { background: var(--warning); }
+        .strength-seg.good   { background: #3b82f6; }
+        .strength-seg.strong { background: var(--success); }
+        .strength-label {
+            font-size: 12px;
+            margin-top: 4px;
+            font-weight: 600;
+            min-height: 16px;
+        }
+        .strength-label.weak   { color: var(--danger); }
+        .strength-label.fair   { color: var(--warning); }
+        .strength-label.good   { color: #3b82f6; }
+        .strength-label.strong { color: var(--success); }
+        /* Match indicator */
+        .match-indicator {
+            font-size: 12px;
+            margin-top: 4px;
+            font-weight: 600;
+            min-height: 16px;
+        }
+        .match-ok  { color: var(--success); }
+        .match-err { color: var(--danger); }
+    </style>
+</head>
+<body class="auth-body">
+
+    <div class="auth-container">
+        <div class="auth-brand">
+            <a href="../index.html">
+                <span class="brand-icon">⚡</span>
+                <span class="brand-name">FreelanceHub</span>
+            </a>
+        </div>
+
+        <div class="auth-card">
+            <h2>Create Your Account</h2>
+            <p class="auth-subtitle">Join FreelanceHub today — it's free</p>
+
+            <!-- Role Toggle -->
+            <div class="role-toggle">
+                <button type="button" class="role-btn active" id="clientBtn" onclick="selectRole('CLIENT')">
+                    <span>🏢</span> I'm a Client
+                </button>
+                <button type="button" class="role-btn" id="freelancerBtn" onclick="selectRole('FREELANCER')">
+                    <span>💻</span> I'm a Freelancer
+                </button>
+            </div>
+            <input type="hidden" id="selectedRole" value="CLIENT">
+
+            <div id="alert-box" class="alert hidden"></div>
+
+            <form id="signupForm" novalidate>
+                <!-- Full Name -->
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" placeholder="John Doe" required autocomplete="name">
+                </div>
+
+                <!-- Email -->
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
+                </div>
+
+                <!-- Password with strength -->
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="password" placeholder="At least 6 characters"
+                               required minlength="6" autocomplete="new-password"
+                               oninput="updateStrength(this.value)">
+                        <button type="button" class="toggle-password"
+                                onclick="togglePassword('password')" aria-label="Toggle password visibility">👁</button>
+                    </div>
+                    <!-- Strength bar (4 segments) -->
+                    <div class="strength-bar-wrap" id="strengthBar" aria-hidden="true">
+                        <div class="strength-seg" id="seg1"></div>
+                        <div class="strength-seg" id="seg2"></div>
+                        <div class="strength-seg" id="seg3"></div>
+                        <div class="strength-seg" id="seg4"></div>
+                    </div>
+                    <div class="strength-label" id="strengthLabel"></div>
+                </div>
+
+                <!-- Confirm Password with match indicator -->
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="confirmPassword" placeholder="Repeat your password"
+                               required autocomplete="new-password"
+                               oninput="checkMatch()">
+                        <button type="button" class="toggle-password"
+                                onclick="togglePassword('confirmPassword')" aria-label="Toggle confirm password visibility">👁</button>
+                    </div>
+                    <div class="match-indicator" id="matchIndicator"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full" id="signupBtn">
+                    <span id="signupBtnText">Create Account</span>
+                    <span id="signupSpinner" class="spinner hidden"></span>
+                </button>
+            </form>
+
+            <p class="auth-switch">
+                Already have an account? <a href="login.html">Sign in</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        // Pre-select role from URL param
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('role') === 'FREELANCER') selectRole('FREELANCER');
+
+        // ---- Password strength ----
+        function getStrength(pw) {
+            let score = 0;
+            if (pw.length >= 6)  score++;
+            if (pw.length >= 10) score++;
+            if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+            if (/[0-9]/.test(pw)) score++;
+            if (/[^A-Za-z0-9]/.test(pw)) score = Math.min(4, score + 1);
+            return Math.min(4, score);
+        }
+
+        const STRENGTH_LEVELS = [
+            { label: '',         cls: ''       },
+            { label: 'Weak',     cls: 'weak'   },
+            { label: 'Fair',     cls: 'fair'   },
+            { label: 'Good',     cls: 'good'   },
+            { label: 'Strong 💪', cls: 'strong' },
+        ];
+
+        function updateStrength(pw) {
+            const score = pw.length === 0 ? 0 : getStrength(pw);
+            const lvl   = STRENGTH_LEVELS[score];
+            const segs  = ['seg1','seg2','seg3','seg4'];
+
+            segs.forEach((id, i) => {
+                const el = document.getElementById(id);
+                el.className = 'strength-seg';
+                if (pw.length > 0 && i < score) el.classList.add(lvl.cls);
+            });
+
+            const lbl = document.getElementById('strengthLabel');
+            lbl.textContent  = pw.length > 0 ? lvl.label : '';
+            lbl.className    = `strength-label ${pw.length > 0 ? lvl.cls : ''}`;
+
+            // Re-check match if confirm is already typed
+            checkMatch();
+        }
+
+        function checkMatch() {
+            const pw  = document.getElementById('password').value;
+            const cpw = document.getElementById('confirmPassword').value;
+            const ind = document.getElementById('matchIndicator');
+            if (!cpw) { ind.textContent = ''; ind.className = 'match-indicator'; return; }
+            if (pw === cpw) {
+                ind.textContent = '✓ Passwords match';
+                ind.className   = 'match-indicator match-ok';
+            } else {
+                ind.textContent = '✗ Passwords do not match';
+                ind.className   = 'match-indicator match-err';
+            }
+        }
+
+        // ---- Form submit ----
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fullName = document.getElementById('fullName').value.trim();
+            const email    = document.getElementById('email').value.trim();
+            const pw       = document.getElementById('password').value;
+            const cpw      = document.getElementById('confirmPassword').value;
+            const role     = document.getElementById('selectedRole').value;
+
+            if (!fullName) { showAlert('Please enter your full name.'); return; }
+            if (pw !== cpw) { showAlert('Passwords do not match.'); return; }
+            if (getStrength(pw) < 1) { showAlert('Password is too weak. Use at least 6 characters.'); return; }
+
+            await handleRegister(fullName, email, pw, role);
+        });
+    </script>
+</body>
+</html>
