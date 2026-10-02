@@ -43,6 +43,7 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints — no token needed
+                .requestMatchers("/**", "/*.html", "/css/**", "/js/**", "/pages/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/projects/open").permitAll()
                 .requestMatchers("/api/projects/search").permitAll()
