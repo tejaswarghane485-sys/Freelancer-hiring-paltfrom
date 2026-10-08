@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/dashboard.css">
 </head>
-<body class="app-body">
+<body class="app-body freelancer-dashboard">
 
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -35,13 +35,16 @@
             <a href="#" class="nav-item" data-section="manage-projects">
                 <span class="nav-icon">📁</span> Manage Projects
             </a>
+            <a href="#" class="nav-item" data-section="payments">
+                <span class="nav-icon">💳</span> Payments
+            </a>
         </nav>
         <div class="sidebar-footer">
             <div class="user-info">
                 <div class="user-avatar" id="sidebarAvatar">F</div>
                 <div>
                     <div class="user-name" id="sidebarName">Freelancer</div>
-                    <div class="user-role-label">Freelancer</div>
+                    <div class="role-badge" id="activeRoleBadge">FREELANCER</div>
                 </div>
             </div>
             <button class="btn-logout" onclick="logout()">⇦ Logout</button>
@@ -117,6 +120,76 @@
 
         <!-- ── MY PROFILE ── -->
         <section class="content-section" id="section-my-profile">
+            <div class="section-card profile-details-card">
+                <div class="profile-card-heading">
+                    <div>
+                        <p class="profile-eyebrow">YOUR ACCOUNT</p>
+                        <h2>My Profile</h2>
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm" id="editAccountProfileBtn">Edit Profile</button>
+                </div>
+                <div id="accountProfileAlert" class="alert hidden" role="status" aria-live="polite"></div>
+                <div class="profile-hero">
+                    <div class="profile-avatar-wrap">
+                        <div class="profile-avatar" id="accountProfileAvatar" aria-hidden="true">U</div>
+                        <span class="profile-avatar-badge" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                        </span>
+                    </div>
+                    <div class="profile-identity">
+                        <div class="profile-identity-heading">
+                            <h3 id="accountProfileDisplayName">Loading profile…</h3>
+                            <span class="profile-role-badge" id="accountProfileRoleBadge">Freelancer</span>
+                        </div>
+                        <p class="profile-display-email" id="accountProfileDisplayEmail"></p>
+                        <p class="profile-identity-note">Your profile, all in one place.</p>
+                    </div>
+                </div>
+                <form id="accountProfileForm" class="form-layout profile-details-form">
+                    <div class="profile-fields-grid">
+                        <div class="profile-field form-group">
+                            <span class="profile-field-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.5-3.5 3-5.5 7-5.5s6.5 2 7 5.5"/></svg>
+                            </span>
+                            <div class="profile-field-control">
+                                <label for="accountProfileName">Name</label>
+                                <input type="text" id="accountProfileName" maxlength="100" autocomplete="name" required disabled>
+                            </div>
+                        </div>
+                        <div class="profile-field form-group">
+                            <span class="profile-field-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false"><path d="M6.5 3.5h3l1.5 4-2 1.5a15 15 0 0 0 6 6l1.5-2 4 1.5v3c0 1.1-.9 2-2 2C10 19.5 4.5 14 4.5 5.5c0-1.1.9-2 2-2Z"/></svg>
+                            </span>
+                            <div class="profile-field-control">
+                                <label for="accountProfilePhone">Phone Number</label>
+                                <input type="tel" id="accountProfilePhone" maxlength="20" autocomplete="tel" disabled>
+                            </div>
+                        </div>
+                        <div class="profile-field form-group profile-field-readonly">
+                            <span class="profile-field-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></svg>
+                            </span>
+                            <div class="profile-field-control">
+                                <label for="accountProfileEmail">Email <span class="profile-readonly-label">READ ONLY</span></label>
+                                <input type="email" id="accountProfileEmail" autocomplete="email" disabled>
+                            </div>
+                        </div>
+                        <div class="profile-field form-group profile-field-bio">
+                            <span class="profile-field-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false"><path d="M5 5.5h14v10H11l-5 4v-14Z"/><path d="M8 9h8M8 12h5"/></svg>
+                            </span>
+                            <div class="profile-field-control">
+                                <label for="accountProfileBio">About / Bio</label>
+                                <textarea id="accountProfileBio" rows="3" maxlength="2000" placeholder="A little about you…" disabled></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions hidden" id="accountProfileActions">
+                        <button type="submit" class="btn btn-primary" id="saveAccountProfileBtn">Save Changes</button>
+                        <button type="button" class="btn btn-outline" id="cancelAccountProfileBtn">Cancel</button>
+                    </div>
+                </form>
+            </div>
             <div class="section-card">
                 <div class="card-header"><h2>My Professional Profile</h2></div>
                 <div id="profileAlert" class="alert hidden"></div>
@@ -204,12 +277,47 @@
         <!-- ── MANAGE PROJECTS ── -->
         <section class="content-section" id="section-manage-projects">
             <div class="section-card">
-                <div class="card-header"><h2>My Active Projects</h2></div>
-                <div id="activeProjectsList" class="proposals-list">
+                <div class="card-header"><h2>Manage Projects</h2></div>
+                <div class="assigned-projects-grid">
+                    <section class="assigned-project-column" aria-labelledby="activeProjectsHeading">
+                        <h3 id="activeProjectsHeading">Active Projects</h3>
+                        <div id="activeProjectsList" class="proposals-list">
+                            <div class="skeleton-list"></div>
+                        </div>
+                    </section>
+                    <section class="assigned-project-column" aria-labelledby="completedProjectsHeading">
+                        <h3 id="completedProjectsHeading">Completed Projects</h3>
+                        <div id="completedProjectsList" class="proposals-list">
+                            <div class="skeleton-list"></div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── PAYMENTS ── -->
+        <section class="content-section" id="section-payments">
+            <div class="section-card">
+                <div class="card-header">
+                    <div>
+                        <h2>Payment History</h2>
+                        <p class="payments-subtitle">A detailed record of payments received from clients.</p>
+                    </div>
+                </div>
+                <div class="earnings-summary">
+                    <span class="earnings-summary-icon" aria-hidden="true">₹</span>
+                    <div>
+                        <span class="earnings-summary-label">Total Earnings</span>
+                        <strong id="totalEarnings">₹0</strong>
+                    </div>
+                    <span class="earnings-summary-caption">Payments received</span>
+                </div>
+                <div id="freelancerPaymentsList" class="payments-table-wrap">
                     <div class="skeleton-list"></div>
                 </div>
             </div>
         </section>
+
     </main>
 
     <!-- ══ MODAL: Submit Proposal ══ -->
@@ -249,6 +357,25 @@
         <div class="modal">
             <button class="modal-close" onclick="closeModal('projectDetailModal')" aria-label="Close">✕</button>
             <div id="projectDetailContent"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="receiptModal" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+        <div class="modal receipt-modal">
+            <button class="modal-close" onclick="closeModal('receiptModal')" aria-label="Close">✕</button>
+            <div class="receipt-success-icon" aria-hidden="true">✓</div>
+            <p class="receipt-eyebrow">PAYMENT CONFIRMATION</p>
+            <h2 id="receiptTitle">Payment receipt</h2>
+            <p class="receipt-transaction" id="receiptTransactionId"></p>
+            <div class="receipt-details">
+                <div><span>Project</span><strong id="receiptProject"></strong></div>
+                <div><span id="receiptPartyLabel">Received From</span><strong id="receiptParty"></strong></div>
+                <div><span>Amount</span><strong id="receiptAmount"></strong></div>
+                <div><span>Payment method</span><strong id="receiptMethod"></strong></div>
+                <div><span>Date &amp; time</span><strong id="receiptDate"></strong></div>
+                <div><span>Status</span><strong class="receipt-status" id="receiptStatus"></strong></div>
+            </div>
+            <button type="button" class="btn btn-outline receipt-close-btn" onclick="closeModal('receiptModal')">Close</button>
         </div>
     </div>
 

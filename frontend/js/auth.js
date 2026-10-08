@@ -35,7 +35,9 @@ function selectRole(role) {
 // ── Redirect after auth ───────────────────────────────────
 function redirectToDashboard(role) {
     // All auth pages are in /pages/, so dashboard links are siblings.
-    if (role === 'CLIENT') {
+    if (role === 'ADMIN') {
+        window.location.href = 'admin-dashboard.html';
+    } else if (role === 'CLIENT') {
         window.location.href = 'client-dashboard.html';
     } else {
         window.location.href = 'freelancer-dashboard.html';
@@ -43,12 +45,21 @@ function redirectToDashboard(role) {
 }
 
 // ── Login ─────────────────────────────────────────────────
-async function handleLogin(email, password) {
+async function handleLogin(email, password, portal = 'USER') {
     setLoading('loginBtn', 'loginBtnText', 'loginSpinner', true);
     try {
         const data = await Auth.login({ email, password });
-        _storeSession(data);
-        redirectToDashboard(data.role);
+        const role = String(data.role || '').toUpperCase();
+        if (portal === 'ADMIN' && role !== 'ADMIN') {
+            showAlert('This account is not authorized for the Admin Portal.');
+            return;
+        }
+        _storeSession({ ...data, role });
+        if (portal === 'ADMIN') {
+            window.location.href = 'admin-dashboard.html';
+        } else {
+            redirectToDashboard(role);
+        }
     } catch (err) {
         showAlert(err.message || 'Login failed. Please check your credentials.');
     } finally {

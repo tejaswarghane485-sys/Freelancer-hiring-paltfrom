@@ -9,6 +9,7 @@ import com.freelancer.repository.ProjectRepository;
 import com.freelancer.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,13 +19,15 @@ public class ProposalService {
     @Autowired private ProposalRepository proposalRepository;
     @Autowired private ProjectRepository projectRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private PaymentService paymentService;
 
+    @Transactional
     public Proposal submitProposal(Long freelancerId, ProposalRequest request) {
         if (proposalRepository.existsByProjectIdAndFreelancerId(request.getProjectId(), freelancerId)) {
             throw new RuntimeException("You have already submitted a proposal for this project");
         }
 
-        Project project = projectRepository.findById(request.getProjectId())
+        Project project = projectRepository.findByIdForUpdate(request.getProjectId())
                 .orElseThrow(() -> new RuntimeException("Project not found"));
 
         if (project.getStatus() != Project.Status.OPEN) {
@@ -42,7 +45,10 @@ public class ProposalService {
         proposal.setEstimatedDays(request.getEstimatedDays());
         proposal.setStatus(Proposal.Status.PENDING);
 
-        return proposalRepository.save(proposal);
+        Proposal savedProposal = proposalRepository.save(proposal);
+        project.setStatus(Project.Status.IN_PROGRESS);
+        projectRepository.save(project);
+        return savedProposal;
     }
 
     public List<Proposal> getProposalsForProject(Long projectId) {
@@ -53,6 +59,7 @@ public class ProposalService {
         return proposalRepository.findByFreelancerId(freelancerId);
     }
 
+    @Transactional
     public Proposal updateProposalStatus(Long proposalId, Long clientId, String status) {
         Proposal proposal = proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new RuntimeException("Proposal not found"));
@@ -61,15 +68,63 @@ public class ProposalService {
             throw new RuntimeException("Unauthorized");
         }
 
-        proposal.setStatus(Proposal.Status.valueOf(status.toUpperCase()));
-        return proposalRepository.save(proposal);
+        Proposal.Status newStatus = Proposal.Status.valueOf(status.toUpperCase());
+        Project project = projectRepository.findByIdForUpdate(proposal.getProject().getId())
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        Proposal.Status previousStatus = proposal.getStatus();
+        if (newStatus == Proposal.Status.ACCEPTED) {
+            if (project.getPaymentStatus() == Project.PaymentStatus.PAID) {
+                throw new RuntimeException("This project has already been paid");
+            }
+            proposalRepository.findByProjectId(project.getId()).stream()
+                    .filter(other -> !other.getId().equals(proposalId)
+                            && other.getStatus() == Proposal.Status.ACCEPTED)
+                    .forEach(other -> {
+                        other.setStatus(Proposal.Status.REJECTED);
+                        proposalRepository.save(other);
+                    });
+        } else if (previousStatus == Proposal.Status.ACCEPTED) {
+            if (project.getPaymentStatus() == Project.PaymentStatus.PAID) {
+                throw new RuntimeException("A paid proposal cannot be changed");
+            }
+        }
+        proposal.setProject(project);
+        proposal.setStatus(newStatus);
+        Proposal savedProposal;
+        if (newStatus == Proposal.Status.ACCEPTED) {
+            java.math.BigDecimal amount = proposal.getProposedBudget() != null
+                    ? proposal.getProposedBudget()
+                    : project.getBudget();
+            if (amount == null || amount.signum() <= 0) {
+                throw new RuntimeException("Set a positive proposal or project amount before accepting");
+            }
+            savedProposal = proposalRepository.save(proposal);
+            paymentService.createPendingInvoice(project, proposal.getFreelancer(), amount);
+            project.setStatus(Project.Status.IN_PROGRESS);
+            projectRepository.save(project);
+        } else if (previousStatus == Proposal.Status.ACCEPTED) {
+            paymentService.removePendingInvoice(project.getId(), proposal.getFreelancer().getId());
+            savedProposal = proposalRepository.save(proposal);
+        } else {
+            savedProposal = proposalRepository.save(proposal);
+        }
+        return savedProposal;
     }
 
+    @Transactional
     public void deleteProposal(Long proposalId, Long freelancerId) {
         Proposal proposal = proposalRepository.findById(proposalId)
                 .orElseThrow(() -> new RuntimeException("Proposal not found"));
         if (!proposal.getFreelancer().getId().equals(freelancerId)) {
             throw new RuntimeException("Unauthorized");
+        }
+        Project project = projectRepository.findByIdForUpdate(proposal.getProject().getId())
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        if (proposal.getStatus() == Proposal.Status.ACCEPTED) {
+            if (project.getPaymentStatus() == Project.PaymentStatus.PAID) {
+                throw new RuntimeException("A paid proposal cannot be deleted");
+            }
+            paymentService.removePendingInvoice(project.getId(), proposal.getFreelancer().getId());
         }
         proposalRepository.delete(proposal);
     }

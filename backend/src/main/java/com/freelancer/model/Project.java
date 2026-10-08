@@ -45,9 +45,14 @@ public class Project {
 
     private LocalDate deadline;
 
+    @Column(name = "status", nullable = false, length = 50, columnDefinition = "varchar(50) not null")
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Status status = Status.OPEN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false, length = 20,
+            columnDefinition = "varchar(20) not null default 'UNPAID'")
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -67,6 +72,10 @@ public class Project {
     }
 
     public enum Status {
-        OPEN, IN_PROGRESS, COMPLETED, CLOSED
+        OPEN, IN_PROGRESS, SUBMITTED, COMPLETED, CLOSED
+    }
+
+    public enum PaymentStatus {
+        UNPAID, PAID
     }
 }

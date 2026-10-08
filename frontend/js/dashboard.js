@@ -58,10 +58,12 @@ function showSection(sectionId) {
         'freelancers':     'Browse Freelancers',
         'proposals':       'View Proposals',
         'hiring':          'Hiring Requests',
+        'payments':        'Payments',
         'my-profile':      'My Profile',
         'browse-projects': 'Browse Projects',
         'my-proposals':    'My Proposals',
         'hiring-requests': 'Hiring Requests',
+        'manage-users':    'Manage Users',
         'manage-projects': 'Manage Projects',
     };
     const pageTitle = document.getElementById('pageTitle');
@@ -81,6 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    initializeAccountProfile();
+
     // ── Task 6: Enter-key search on all search inputs ──
     document.querySelectorAll('.search-bar input').forEach(input => {
         input.addEventListener('keydown', (e) => {
@@ -93,6 +97,104 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+let accountProfileSnapshot = null;
+let accountProfileEditing = false;
+
+function initializeAccountProfile() {
+    const form = document.getElementById('accountProfileForm');
+    if (!form) return;
+
+    const editButton = document.getElementById('editAccountProfileBtn');
+    const cancelButton = document.getElementById('cancelAccountProfileBtn');
+    editButton.disabled = true;
+    form.addEventListener('submit', saveAccountProfile);
+    editButton.addEventListener('click', () => setAccountProfileEditing(true));
+    cancelButton.addEventListener('click', cancelAccountProfileEditing);
+    loadAccountProfile();
+}
+
+async function loadAccountProfile() {
+    try {
+        accountProfileSnapshot = await Account.getProfile();
+        renderAccountProfile(accountProfileSnapshot);
+        document.getElementById('editAccountProfileBtn').disabled = false;
+    } catch (error) {
+        showInlineAlert('accountProfileAlert', `Could not load your profile: ${error.message}`, 'error');
+    }
+}
+
+function renderAccountProfile(profile) {
+    const fullName = profile.fullName || '';
+    const email = profile.email || '';
+    const role = profile.role === 'FREELANCER' ? 'Freelancer'
+        : profile.role === 'CLIENT' ? 'Client'
+            : profile.role || '';
+    document.getElementById('accountProfileName').value = fullName;
+    document.getElementById('accountProfileEmail').value = email;
+    document.getElementById('accountProfilePhone').value = profile.phone || '';
+    document.getElementById('accountProfileBio').value = profile.bio || '';
+    document.getElementById('accountProfileDisplayName').textContent = fullName || 'Your profile';
+    document.getElementById('accountProfileDisplayEmail').textContent = email;
+    document.getElementById('accountProfileRoleBadge').textContent = role;
+    document.getElementById('accountProfileAvatar').textContent = fullName.trim().charAt(0).toUpperCase() || 'U';
+    setAccountProfileEditing(false);
+}
+
+function setAccountProfileEditing(editing) {
+    accountProfileEditing = editing;
+    ['accountProfileName', 'accountProfilePhone', 'accountProfileBio'].forEach(id => {
+        document.getElementById(id).disabled = !editing;
+    });
+    document.getElementById('editAccountProfileBtn').classList.toggle('hidden', editing);
+    document.getElementById('accountProfileActions').classList.toggle('hidden', !editing);
+    if (editing) document.getElementById('accountProfileName').focus();
+}
+
+function cancelAccountProfileEditing() {
+    if (accountProfileSnapshot) renderAccountProfile(accountProfileSnapshot);
+    else setAccountProfileEditing(false);
+    document.getElementById('accountProfileAlert').classList.add('hidden');
+}
+
+async function saveAccountProfile(event) {
+    event.preventDefault();
+    if (!accountProfileEditing) return;
+
+    const saveButton = document.getElementById('saveAccountProfileBtn');
+    const cancelButton = document.getElementById('cancelAccountProfileBtn');
+    saveButton.disabled = true;
+    cancelButton.disabled = true;
+    saveButton.textContent = 'Saving…';
+
+    try {
+        const response = await Account.updateProfile({
+            fullName: document.getElementById('accountProfileName').value.trim(),
+            phone: document.getElementById('accountProfilePhone').value.trim(),
+            bio: document.getElementById('accountProfileBio').value.trim(),
+        });
+        if (response.token) sessionStorage.setItem('token', response.token);
+        await loadAccountProfile();
+        accountProfileSnapshot = accountProfileSnapshot || response.profile || response;
+        renderAccountProfile(accountProfileSnapshot);
+        const name = accountProfileSnapshot.fullName;
+        sessionStorage.setItem('fullName', name);
+        const sidebarName = document.getElementById('sidebarName');
+        const topbarName = document.getElementById('topbarName');
+        const sidebarAvatar = document.getElementById('sidebarAvatar');
+        if (sidebarName) sidebarName.textContent = name;
+        if (topbarName) topbarName.textContent = name;
+        if (sidebarAvatar) sidebarAvatar.textContent = name.charAt(0).toUpperCase();
+        showInlineAlert('accountProfileAlert', 'Profile updated successfully.', 'success');
+        toast('Profile updated successfully.');
+    } catch (error) {
+        showInlineAlert('accountProfileAlert', `Could not save your profile: ${error.message}`, 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Changes';
+        cancelButton.disabled = false;
+    }
+}
 
 // ---- Sidebar toggle (mobile) ----
 function toggleSidebar() {
@@ -133,6 +235,21 @@ function openModal(id) {
 function closeModal(id) {
     document.getElementById(id)?.classList.add('hidden');
 }
+
+function viewPaymentReceipt(payment, partyLabel, partyName) {
+    document.getElementById('receiptTransactionId').textContent = payment.transactionId || '—';
+    document.getElementById('receiptPartyLabel').textContent = partyLabel;
+    document.getElementById('receiptParty').textContent = partyName || '—';
+    document.getElementById('receiptProject').textContent = payment.projectTitle || '—';
+    document.getElementById('receiptAmount').textContent = formatCurrency(payment.amount);
+    document.getElementById('receiptMethod').textContent = payment.paymentMethod
+        ? paymentMethodLabel(payment.paymentMethod)
+        : '—';
+    document.getElementById('receiptDate').textContent = formatDateTime(payment.paymentDate);
+    document.getElementById('receiptStatus').textContent = payment.status === 'PAID' ? 'SUCCESS' : 'PENDING';
+    openModal('receiptModal');
+}
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => m.classList.add('hidden'));
@@ -259,6 +376,21 @@ function formatDate(dateStr) {
 function formatCurrency(amount) {
     if (amount === null || amount === undefined || amount === '') return 'N/A';
     return '₹' + Number(amount).toLocaleString('en-IN');
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '—';
+    const normalized = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr) ? dateStr : `${dateStr}Z`;
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(date);
+}
+
+function paymentMethodLabel(method) {
+    return method === 'NET_BANKING' ? 'Net Banking' : method === 'CARD' ? 'Card' : method === 'UPI' ? 'UPI' : '—';
 }
 
 function renderSkillTags(skillsStr) {

@@ -37,6 +37,7 @@ Freelancer hiring platform/
     ├── index.html               ← Landing page
     ├── pages/
     │   ├── login.html
+    │   ├── forgot-password.html
     │   ├── signup.html
     │   ├── client-dashboard.html
     │   └── freelancer-dashboard.html
@@ -52,6 +53,19 @@ Freelancer hiring platform/
         ├── client.js            ← Client dashboard logic
         └── freelancer.js        ← Freelancer dashboard logic
 ```
+
+Payment records are persisted when a proposal or hiring request is accepted;
+recording payment marks the invoice paid, stores a transaction ID, and updates
+the project payment status. The ledger does not charge cards or transfer funds;
+a payment-provider integration is not configured. The dashboards no longer
+include a Payments & Billing tab.
+
+Authenticated account endpoints are `GET/PUT /api/account/profile` and
+`POST /api/account/change-password`. Profile updates accept `fullName`, `phone`,
+and `bio`; email and role are returned for display and cannot be changed through
+the profile update endpoint. Payment endpoints are `GET /api/payments/client`
+(the client's invoices and transactions), `GET /api/payments/freelancer` (payments
+and total earnings), and `POST /api/payments/pay` (body: `{"projectId": 123}`).
 
 ---
 

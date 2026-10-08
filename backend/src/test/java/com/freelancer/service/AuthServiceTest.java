@@ -3,6 +3,7 @@ package com.freelancer.service;
 import com.freelancer.dto.AuthRequest;
 import com.freelancer.dto.AuthResponse;
 import com.freelancer.dto.RegisterRequest;
+import com.freelancer.dto.ResetPasswordRequest;
 import com.freelancer.model.User;
 import com.freelancer.repository.UserRepository;
 import com.freelancer.security.JwtUtil;
@@ -13,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -80,6 +82,18 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerRejectsAdminRole() {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("admin@example.com");
+        request.setRole("ADMIN");
+        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void loginReturnsTokenWhenPasswordMatches() {
         AuthRequest request = new AuthRequest();
         request.setEmail("jamie@example.com");
@@ -103,6 +117,48 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginRejectsAdminAccountOutsideConfiguredAdminEmail() {
+        ReflectionTestUtils.setField(authService, "configuredAdminEmail", "admin@example.com");
+        AuthRequest request = new AuthRequest();
+        request.setEmail("other-admin@example.com");
+        request.setPassword("password123");
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPassword("encoded-password");
+        user.setRole(User.Role.ADMIN);
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+
+        assertThrows(RuntimeException.class, () -> authService.login(request));
+        verify(jwtUtil, never()).generateToken(user.getEmail(), "ADMIN", null);
+    }
+
+    @Test
+    void loginAllowsConfiguredAdminAccount() {
+        String adminEmail = "rajshri@admin.com";
+        ReflectionTestUtils.setField(authService, "configuredAdminEmail", adminEmail);
+        AuthRequest request = new AuthRequest();
+        request.setEmail(adminEmail);
+        request.setPassword("password123");
+
+        User user = new User();
+        user.setId(99L);
+        user.setFullName("Administrator");
+        user.setEmail(adminEmail);
+        user.setPassword("encoded-password");
+        user.setRole(User.Role.ADMIN);
+        when(userRepository.findByEmail(adminEmail)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+        when(jwtUtil.generateToken(adminEmail, "ADMIN", 99L)).thenReturn("admin-jwt-token");
+
+        AuthResponse response = authService.login(request);
+
+        assertEquals("admin-jwt-token", response.getToken());
+        assertEquals("ADMIN", response.getRole());
+    }
+
+    @Test
     void loginRejectsUnknownEmailAndIncorrectPassword() {
         AuthRequest request = new AuthRequest();
         request.setEmail("missing@example.com");
@@ -120,5 +176,33 @@ class AuthServiceTest {
         when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(false);
 
         assertThrows(RuntimeException.class, () -> authService.login(request));
+    }
+
+    @Test
+    void resetPasswordStoresEncodedPassword() {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("jamie@example.com");
+        request.setNewPassword("new-password");
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPassword("old-encoded-password");
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(request.getNewPassword())).thenReturn("new-encoded-password");
+
+        authService.resetPassword(request);
+
+        assertEquals("new-encoded-password", user.getPassword());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void resetPasswordRejectsUnknownEmail() {
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setEmail("missing@example.com");
+        request.setNewPassword("new-password");
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> authService.resetPassword(request));
     }
 }

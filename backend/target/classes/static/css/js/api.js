@@ -2,7 +2,7 @@
    API Layer — all application data comes from the Spring Boot API
    ============================================================ */
 
-const API BASE = '/api';
+const API_BASE = '/api';
 async function apiCall(endpoint, options = {}) {
     const token = sessionStorage.getItem('token');
     const headers = {
@@ -13,7 +13,7 @@ async function apiCall(endpoint, options = {}) {
 
     let response;
     try {
-        response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+        response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers, cache: 'no-store' });
     } catch (error) {
         throw new Error(`Cannot connect to ${API_BASE}. Make sure the Spring Boot backend is running and the frontend origin is allowed by CORS.`);
     }
@@ -72,6 +72,7 @@ const Projects = {
         method: 'PATCH',
         body: JSON.stringify({ status }),
     }),
+    submitWork: (id) => apiCall(`/projects/${id}/submit`, { method: 'POST' }),
     delete: (id) => apiCall(`/projects/${id}`, { method: 'DELETE' }),
     search: (params) => apiCall(`/projects/search?${new URLSearchParams(params)}`),
 };
@@ -102,15 +103,22 @@ const Proposals = {
 };
 
 const Hiring = {
-    send: (body) => apiCall('/hiring', {
+    send: (body) => apiCall('/hiring-requests', {
         method: 'POST',
         body: JSON.stringify(body),
     }),
-    respond: (id, status) => apiCall(`/hiring/${id}/respond`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
+    accept: (id) => apiCall(`/hiring-requests/${id}/accept`, { method: 'PUT' }),
+    reject: (id) => apiCall(`/hiring-requests/${id}/reject`, { method: 'PUT' }),
+    getReceived: () => apiCall('/hiring-requests/received'),
+    getSent: () => apiCall('/hiring-requests/sent'),
+    getForProject: (projectId) => apiCall(`/hiring-requests/project/${projectId}`),
+};
+
+const Payments = {
+    getClientTransactions: () => apiCall('/payments/client'),
+    getFreelancerEarnings: () => apiCall('/payments/freelancer'),
+    pay: (projectId, paymentMethod) => apiCall('/payments/pay', {
+        method: 'POST',
+        body: JSON.stringify({ projectId, paymentMethod }),
     }),
-    getReceived: () => apiCall('/hiring/received'),
-    getSent: () => apiCall('/hiring/sent'),
-    getForProject: (projectId) => apiCall(`/hiring/project/${projectId}`),
 };

@@ -1,5 +1,5 @@
 /* ============================================================
-   Auth Pages (Login / Signup) Styles
+   Auth Pages (Login / Signup / Password Reset) Styles
    ============================================================ */
 
 .auth-body {
@@ -112,6 +112,20 @@
     margin-top: 16px;
 }
 
+.forgot-password-link {
+    text-align: right;
+    font-size: 14px;
+    margin: -8px 0 18px;
+}
+.forgot-password-link a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+.forgot-password-link a:hover {
+    text-decoration: underline;
+}
+
 @media (max-width: 480px) {
     .auth-card { padding: 28px 20px; }
 }
@@ -181,6 +195,23 @@
 .login-page .auth-subtitle {
     font-size: 16px;
     margin-bottom: 26px;
+}
+.login-portals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.login-page .login-portals .role-btn {
+    min-height: 46px;
+    border-color: #e5d8a8;
+    background: #fffef8;
+    color: #475569;
+}
+.login-page .login-portals .role-btn.active {
+    border-color: #c28a08;
+    background: #fff1b8;
+    color: #654500;
 }
 .login-page .form-group label { font-size: 16px; }
 .login-page .form-group {

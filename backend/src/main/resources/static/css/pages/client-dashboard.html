@@ -35,6 +35,9 @@
                 <span class="nav-icon">🤝</span> Hiring Requests
                 <span class="nav-badge hidden" id="hiringBadge">0</span>
             </a>
+            <a href="#" class="nav-item" data-section="payments">
+                <span class="nav-icon">💳</span> Payments
+            </a>
         </nav>
         <div class="sidebar-footer">
             <div class="user-info">
@@ -147,7 +150,7 @@
                     <h2>My Projects</h2>
                     <button class="btn btn-primary btn-sm" onclick="showSection('post-project')">＋ Post New</button>
                 </div>
-                <div id="myProjectsList" class="projects-list">
+                <div id="myProjectsList" class="projects-list" aria-live="polite">
                     <div class="skeleton-list"></div>
                 </div>
             </div>
@@ -187,6 +190,20 @@
             <div class="section-card">
                 <div class="card-header"><h2>Hiring Requests Sent</h2></div>
                 <div id="hiringList" class="proposals-list">
+                    <div class="skeleton-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-section" id="section-payments">
+            <div class="section-card">
+                <div class="card-header">
+                    <div>
+                        <h2>Project Payments</h2>
+                        <p class="payments-subtitle">Review invoices and manage payments to your freelancers.</p>
+                    </div>
+                </div>
+                <div id="clientPaymentsList" class="payments-table-wrap">
                     <div class="skeleton-list"></div>
                 </div>
             </div>
@@ -236,7 +253,8 @@
                     <select id="editProjectStatus">
                         <option value="OPEN">OPEN</option>
                         <option value="IN_PROGRESS">IN_PROGRESS</option>
-                        <option value="COMPLETED">COMPLETED</option>
+                        <option value="SUBMITTED" disabled>SUBMITTED</option>
+                        <option value="COMPLETED" disabled>COMPLETED</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -247,6 +265,46 @@
         </div>
     </div>
 
+    <div class="modal-overlay hidden" id="paymentModal" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+        <div class="modal payment-modal">
+            <button class="modal-close" onclick="closeModal('paymentModal')" aria-label="Close">✕</button>
+            <span class="payment-modal-icon" aria-hidden="true">🔒</span>
+            <h2 id="paymentModalTitle">Complete your payment</h2>
+            <p class="payments-subtitle" id="paymentProjectTitle"></p>
+            <div class="payment-checkout-amount" id="paymentAmount"></div>
+            <div class="form-group">
+                <label for="paymentMethodSelect">Payment method</label>
+                <select id="paymentMethodSelect">
+                    <option value="UPI">UPI</option>
+                    <option value="NET_BANKING">Net Banking</option>
+                    <option value="CARD">Card</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" id="confirmPaymentBtn" onclick="confirmProjectPayment()">Pay Now</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('paymentModal')">Cancel</button>
+            </div>
+            <p class="payment-demo-note">Demo checkout — no real payment will be processed.</p>
+        </div>
+    </div>
+    <div class="modal-overlay hidden" id="receiptModal" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+        <div class="modal receipt-modal">
+            <button class="modal-close" onclick="closeModal('receiptModal')" aria-label="Close">✕</button>
+            <div class="receipt-success-icon" aria-hidden="true">✓</div>
+            <p class="receipt-eyebrow">PAYMENT CONFIRMATION</p>
+            <h2 id="receiptTitle">Payment receipt</h2>
+            <p class="receipt-transaction" id="receiptTransactionId"></p>
+            <div class="receipt-details">
+                <div><span>Project</span><strong id="receiptProject"></strong></div>
+                <div><span id="receiptPartyLabel">Paid To</span><strong id="receiptParty"></strong></div>
+                <div><span>Amount</span><strong id="receiptAmount"></strong></div>
+                <div><span>Payment method</span><strong id="receiptMethod"></strong></div>
+                <div><span>Date &amp; time</span><strong id="receiptDate"></strong></div>
+                <div><span>Status</span><strong class="receipt-status" id="receiptStatus"></strong></div>
+            </div>
+            <button type="button" class="btn btn-outline receipt-close-btn" onclick="closeModal('receiptModal')">Close</button>
+        </div>
+    </div>
     <script src="../js/api.js"></script>
     <script src="../js/dashboard.js"></script>
     <script src="../js/client.js"></script>

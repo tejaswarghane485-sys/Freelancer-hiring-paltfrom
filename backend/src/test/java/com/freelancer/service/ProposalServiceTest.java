@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +34,9 @@ class ProposalServiceTest {
     private ProjectRepository projectRepository;
 
     @Mock
+    private PaymentService paymentService;
+
+    @Mock
     private UserRepository userRepository;
 
     @InjectMocks
@@ -47,7 +51,7 @@ class ProposalServiceTest {
         freelancer.setId(9L);
 
         when(proposalRepository.existsByProjectIdAndFreelancerId(20L, 9L)).thenReturn(false);
-        when(projectRepository.findById(20L)).thenReturn(Optional.of(project));
+        when(projectRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(project));
         when(userRepository.findById(9L)).thenReturn(Optional.of(freelancer));
         when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -63,6 +67,8 @@ class ProposalServiceTest {
         assertEquals(freelancer, saved.getFreelancer());
         assertEquals("I can deliver this project.", saved.getCoverLetter());
         assertEquals(Proposal.Status.PENDING, saved.getStatus());
+        assertEquals(Project.Status.IN_PROGRESS, project.getStatus());
+        verify(projectRepository).save(project);
     }
 
     @Test
@@ -82,7 +88,7 @@ class ProposalServiceTest {
         Project project = new Project();
         project.setStatus(Project.Status.CLOSED);
         when(proposalRepository.existsByProjectIdAndFreelancerId(20L, 9L)).thenReturn(false);
-        when(projectRepository.findById(20L)).thenReturn(Optional.of(project));
+        when(projectRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(project));
 
         ProposalRequest request = new ProposalRequest();
         request.setProjectId(20L);
@@ -105,5 +111,63 @@ class ProposalServiceTest {
         assertThrows(RuntimeException.class, () -> proposalService.updateProposalStatus(30L, 5L, "accepted"));
 
         verify(proposalRepository, never()).save(proposal);
+    }
+
+    @Test
+    void acceptingAProposalRejectsAnyPreviouslyAcceptedProposalForTheProject() {
+        User owner = new User();
+        owner.setId(4L);
+        Project project = new Project();
+        project.setId(20L);
+        project.setClient(owner);
+        Proposal proposal = new Proposal();
+        proposal.setId(30L);
+        proposal.setProject(project);
+        User freelancer = new User();
+        freelancer.setId(9L);
+        proposal.setFreelancer(freelancer);
+        proposal.setProposedBudget(new BigDecimal("450.00"));
+        Proposal previouslyAccepted = new Proposal();
+        previouslyAccepted.setId(31L);
+        previouslyAccepted.setProject(project);
+        previouslyAccepted.setStatus(Proposal.Status.ACCEPTED);
+
+        when(proposalRepository.findById(30L)).thenReturn(Optional.of(proposal));
+        when(projectRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(project));
+        when(proposalRepository.findByProjectId(20L)).thenReturn(List.of(proposal, previouslyAccepted));
+        when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        proposalService.updateProposalStatus(30L, 4L, "accepted");
+
+        assertEquals(Proposal.Status.ACCEPTED, proposal.getStatus());
+        assertEquals(Project.Status.IN_PROGRESS, project.getStatus());
+        assertEquals(Proposal.Status.REJECTED, previouslyAccepted.getStatus());
+        verify(paymentService).createPendingInvoice(project, freelancer, new BigDecimal("450.00"));
+    }
+
+    @Test
+    void acceptingAProposalUpdatesStatusAndActivatesProject() {
+        User owner = new User();
+        owner.setId(4L);
+        Project project = new Project();
+        project.setId(20L);
+        project.setClient(owner);
+        Proposal proposal = new Proposal();
+        proposal.setId(30L);
+        proposal.setProject(project);
+        User freelancer = new User();
+        freelancer.setId(9L);
+        proposal.setFreelancer(freelancer);
+        proposal.setProposedBudget(new BigDecimal("450.00"));
+        when(proposalRepository.findById(30L)).thenReturn(Optional.of(proposal));
+        when(projectRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(project));
+        when(proposalRepository.findByProjectId(20L)).thenReturn(List.of(proposal));
+        when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Proposal result = proposalService.updateProposalStatus(30L, 4L, "accepted");
+
+        assertEquals(Proposal.Status.ACCEPTED, result.getStatus());
+        assertEquals(Project.Status.IN_PROGRESS, project.getStatus());
+        verify(paymentService).createPendingInvoice(project, freelancer, new BigDecimal("450.00"));
     }
 }

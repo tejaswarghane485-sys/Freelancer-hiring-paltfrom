@@ -1,3 +1,8 @@
-com\freelancer\service\AuthServiceTest.class
+com\freelancer\controller\ProjectControllerTest.class
 com\freelancer\service\ProjectServiceTest.class
+com\freelancer\service\AuthServiceTest.class
 com\freelancer\service\ProposalServiceTest.class
+com\freelancer\service\PaymentServiceTest.class
+com\freelancer\controller\PaymentControllerTest.class
+com\freelancer\service\AccountServiceTest.class
+com\freelancer\service\HiringRequestServiceTest.class

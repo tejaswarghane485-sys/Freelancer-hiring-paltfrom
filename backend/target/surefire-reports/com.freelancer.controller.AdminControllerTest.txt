@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.freelancer.controller.AdminControllerTest
+-------------------------------------------------------------------------------
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.477 s -- in com.freelancer.controller.AdminControllerTest

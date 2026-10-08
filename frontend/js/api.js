@@ -2,7 +2,11 @@
    API Layer — all application data comes from the Spring Boot API
    ============================================================ */
 
-co(window.API_BASE_URL || 'https://freelancer-hiring-paltfrom-production.up.railway.app/api').replace(/\/+$/, '');
+const localHosts = ['localhost', '127.0.0.1'];
+const defaultApiBase = localHosts.includes(window.location.hostname)
+    ? 'http://localhost:8080/api'
+    : 'https://freelancer-hiring-paltfrom-production.up.railway.app/api';
+const API_BASE = (window.API_BASE_URL || defaultApiBase).replace(/\/+$/, '');
 
 async function apiCall(endpoint, options = {}) {
     const token = sessionStorage.getItem('token');
@@ -14,7 +18,7 @@ async function apiCall(endpoint, options = {}) {
 
     let response;
     try {
-        response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+        response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers, cache: 'no-store' });
     } catch (error) {
         throw new Error(`Cannot connect to ${API_BASE}. Make sure the Spring Boot backend is running and the frontend origin is allowed by CORS.`);
     }
@@ -57,6 +61,18 @@ const Users = {
     me: () => apiCall('/users/me'),
 };
 
+const Account = {
+    getProfile: () => apiCall('/account/profile'),
+    updateProfile: (body) => apiCall('/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+    }),
+    changePassword: (body) => apiCall('/account/change-password', {
+        method: 'POST',
+        body: JSON.stringify(body),
+    }),
+};
+
 const Projects = {
     getOpen: () => apiCall('/projects/open'),
     getMine: () => apiCall('/projects/my'),
@@ -73,6 +89,7 @@ const Projects = {
         method: 'PATCH',
         body: JSON.stringify({ status }),
     }),
+    submitWork: (id) => apiCall(`/projects/${id}/submit`, { method: 'POST' }),
     delete: (id) => apiCall(`/projects/${id}`, { method: 'DELETE' }),
     search: (params) => apiCall(`/projects/search?${new URLSearchParams(params)}`),
 };
@@ -89,9 +106,18 @@ const Freelancers = {
 };
 
 const Proposals = {
-    submit: (body) => apiCall('/proposals', {
+    submit: ({ projectId, coverLetter, proposedBudget, estimatedDays }) => apiCall('/proposals', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+            projectId: Number(projectId),
+            coverLetter,
+            proposedBudget: proposedBudget === '' || proposedBudget === null || proposedBudget === undefined
+                ? null
+                : Number(proposedBudget),
+            estimatedDays: estimatedDays === '' || estimatedDays === null || estimatedDays === undefined
+                ? null
+                : Number(estimatedDays),
+        }),
     }),
     getMine: () => apiCall('/proposals/my'),
     getForProject: (projectId) => apiCall(`/proposals/project/${projectId}`),
@@ -103,15 +129,26 @@ const Proposals = {
 };
 
 const Hiring = {
-    send: (body) => apiCall('/hiring', {
+    send: (body) => apiCall('/hiring-requests', {
         method: 'POST',
         body: JSON.stringify(body),
     }),
-    respond: (id, status) => apiCall(`/hiring/${id}/respond`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
+    accept: (id) => apiCall(`/hiring-requests/${id}/accept`, { method: 'PUT' }),
+    reject: (id) => apiCall(`/hiring-requests/${id}/reject`, { method: 'PUT' }),
+    getReceived: () => apiCall('/hiring-requests/received'),
+    getSent: () => apiCall('/hiring-requests/sent'),
+    getForProject: (projectId) => apiCall(`/hiring-requests/project/${projectId}`),
+};
+
+const Payments = {
+    getClientTransactions: () => apiCall('/payments/client'),
+    getFreelancerEarnings: () => apiCall('/payments/freelancer'),
+    pay: (projectId, paymentMethod) => apiCall('/payments/pay', {
+        method: 'POST',
+        body: JSON.stringify({ projectId, paymentMethod }),
     }),
-    getReceived: () => apiCall('/hiring/received'),
-    getSent: () => apiCall('/hiring/sent'),
-    getForProject: (projectId) => apiCall(`/hiring/project/${projectId}`),
+    refund: (projectId, transactionId) => apiCall('/payments/refund', {
+        method: 'POST',
+        body: JSON.stringify(transactionId ? { transactionId } : { projectId }),
+    }),
 };

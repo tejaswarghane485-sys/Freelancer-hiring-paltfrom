@@ -15,23 +15,36 @@
         </div>
 
         <div class="auth-card">
-            <h2>Welcome Back</h2>
-            <p class="auth-subtitle">Sign in to your account</p>
+            <h2 id="loginHeading">Welcome Back</h2>
+            <p class="auth-subtitle" id="loginSubtitle">Sign in to your account</p>
+
+            <div class="login-portals" role="group" aria-label="Choose sign-in portal">
+                <button type="button" class="role-btn active" id="userPortalButton" aria-pressed="true">
+                    User Login
+                </button>
+                <button type="button" class="role-btn" id="adminPortalButton" aria-pressed="false">
+                    Admin Portal
+                </button>
+            </div>
 
             <div id="alert-box" class="alert hidden"></div>
 
             <form id="loginForm">
                 <div class="form-group">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                    <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="username">
                 </div>
 
                 <div class="form-group">
                     <label for="password">Password</label>
                     <div class="input-with-icon">
-                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                         <button type="button" class="toggle-password" onclick="togglePassword('password')">👁</button>
                     </div>
+                </div>
+
+                <div class="forgot-password-link">
+                    <a href="forgot-password.html">Forgot Password?</a>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-full" id="loginBtn">
@@ -40,10 +53,13 @@
                 </button>
             </form>
 
-            <div class="auth-divider"><span>or</span></div>
+            <div class="auth-divider" id="loginDivider"><span>or</span></div>
 
-            <p class="auth-switch">
+            <p class="auth-switch" id="signupPrompt">
                 Don't have an account? <a href="signup.html">Sign up free</a>
+            </p>
+            <p class="auth-switch hidden" id="adminPortalNote">
+                Admin access is restricted to the configured administrator account.
             </p>
         </div>
     </div>
@@ -51,11 +67,42 @@
     <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        const loginForm = document.getElementById('loginForm');
+        const userPortalButton = document.getElementById('userPortalButton');
+        const adminPortalButton = document.getElementById('adminPortalButton');
+        let selectedPortal = new URLSearchParams(window.location.search).get('portal') === 'admin'
+            ? 'ADMIN'
+            : 'USER';
+
+        function setLoginPortal(portal) {
+            selectedPortal = portal;
+            const isAdminPortal = portal === 'ADMIN';
+            document.getElementById('loginHeading').textContent =
+                isAdminPortal ? 'Admin Portal' : 'Welcome Back';
+            document.getElementById('loginSubtitle').textContent =
+                isAdminPortal ? 'Sign in to the administrator account' : 'Sign in to your account';
+            document.getElementById('loginBtnText').textContent =
+                isAdminPortal ? 'Admin Sign In' : 'Sign In';
+            document.getElementById('signupPrompt').classList.toggle('hidden', isAdminPortal);
+            document.getElementById('adminPortalNote').classList.toggle('hidden', !isAdminPortal);
+            document.getElementById('loginDivider').classList.toggle('hidden', isAdminPortal);
+            userPortalButton.classList.toggle('active', !isAdminPortal);
+            adminPortalButton.classList.toggle('active', isAdminPortal);
+            userPortalButton.setAttribute('aria-pressed', String(!isAdminPortal));
+            adminPortalButton.setAttribute('aria-pressed', String(isAdminPortal));
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        userPortalButton.addEventListener('click', () => setLoginPortal('USER'));
+        adminPortalButton.addEventListener('click', () => setLoginPortal('ADMIN'));
+        setLoginPortal(selectedPortal);
+
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             await handleLogin(
                 document.getElementById('email').value,
-                document.getElementById('password').value
+                document.getElementById('password').value,
+                selectedPortal
             );
         });
     </script>

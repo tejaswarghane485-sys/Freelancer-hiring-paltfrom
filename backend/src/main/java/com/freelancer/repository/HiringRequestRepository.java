@@ -2,6 +2,9 @@ package com.freelancer.repository;
 
 import com.freelancer.model.HiringRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,8 +14,13 @@ public interface HiringRequestRepository extends JpaRepository<HiringRequest, Lo
     List<HiringRequest> findByFreelancerId(Long freelancerId);
     List<HiringRequest> findByClientId(Long clientId);
     List<HiringRequest> findByProjectId(Long projectId);
+    List<HiringRequest> findByStatus(HiringRequest.Status status);
+    boolean existsByProjectIdAndFreelancerIdAndStatus(Long projectId, Long freelancerId, HiringRequest.Status status);
     List<HiringRequest> findByFreelancerIdAndStatus(Long freelancerId, HiringRequest.Status status);
     List<HiringRequest> findByClientIdAndStatus(Long clientId, HiringRequest.Status status);
     boolean existsByProjectIdAndFreelancerId(Long projectId, Long freelancerId);
-    void deleteByProjectId(Long projectId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from HiringRequest request where request.project.id = :projectId")
+    void deleteByProjectId(@Param("projectId") Long projectId);
 }

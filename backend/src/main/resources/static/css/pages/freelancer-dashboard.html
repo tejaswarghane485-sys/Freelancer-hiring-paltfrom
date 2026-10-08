@@ -35,6 +35,9 @@
             <a href="#" class="nav-item" data-section="manage-projects">
                 <span class="nav-icon">📁</span> Manage Projects
             </a>
+            <a href="#" class="nav-item" data-section="payments">
+                <span class="nav-icon">💳</span> Payments
+            </a>
         </nav>
         <div class="sidebar-footer">
             <div class="user-info">
@@ -204,8 +207,40 @@
         <!-- ── MANAGE PROJECTS ── -->
         <section class="content-section" id="section-manage-projects">
             <div class="section-card">
-                <div class="card-header"><h2>My Active Projects</h2></div>
-                <div id="activeProjectsList" class="proposals-list">
+                <div class="card-header"><h2>Manage Projects</h2></div>
+                <div class="assigned-projects-grid">
+                    <section class="assigned-project-column" aria-labelledby="activeProjectsHeading">
+                        <h3 id="activeProjectsHeading">Active Projects</h3>
+                        <div id="activeProjectsList" class="proposals-list">
+                            <div class="skeleton-list"></div>
+                        </div>
+                    </section>
+                    <section class="assigned-project-column" aria-labelledby="completedProjectsHeading">
+                        <h3 id="completedProjectsHeading">Completed Projects</h3>
+                        <div id="completedProjectsList" class="proposals-list">
+                            <div class="skeleton-list"></div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+        <section class="content-section" id="section-payments">
+            <div class="section-card">
+                <div class="card-header">
+                    <div>
+                        <h2>Payment History</h2>
+                        <p class="payments-subtitle">A detailed record of payments received from clients.</p>
+                    </div>
+                </div>
+                <div class="earnings-summary">
+                    <span class="earnings-summary-icon" aria-hidden="true">₹</span>
+                    <div>
+                        <span class="earnings-summary-label">Total Earnings</span>
+                        <strong id="totalEarnings">₹0</strong>
+                    </div>
+                    <span class="earnings-summary-caption">Payments received</span>
+                </div>
+                <div id="freelancerPaymentsList" class="payments-table-wrap">
                     <div class="skeleton-list"></div>
                 </div>
             </div>
@@ -249,6 +284,24 @@
         <div class="modal">
             <button class="modal-close" onclick="closeModal('projectDetailModal')" aria-label="Close">✕</button>
             <div id="projectDetailContent"></div>
+        </div>
+    </div>
+    <div class="modal-overlay hidden" id="receiptModal" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+        <div class="modal receipt-modal">
+            <button class="modal-close" onclick="closeModal('receiptModal')" aria-label="Close">✕</button>
+            <div class="receipt-success-icon" aria-hidden="true">✓</div>
+            <p class="receipt-eyebrow">PAYMENT CONFIRMATION</p>
+            <h2 id="receiptTitle">Payment receipt</h2>
+            <p class="receipt-transaction" id="receiptTransactionId"></p>
+            <div class="receipt-details">
+                <div><span>Project</span><strong id="receiptProject"></strong></div>
+                <div><span id="receiptPartyLabel">Received From</span><strong id="receiptParty"></strong></div>
+                <div><span>Amount</span><strong id="receiptAmount"></strong></div>
+                <div><span>Payment method</span><strong id="receiptMethod"></strong></div>
+                <div><span>Date &amp; time</span><strong id="receiptDate"></strong></div>
+                <div><span>Status</span><strong class="receipt-status" id="receiptStatus"></strong></div>
+            </div>
+            <button type="button" class="btn btn-outline receipt-close-btn" onclick="closeModal('receiptModal')">Close</button>
         </div>
     </div>
 

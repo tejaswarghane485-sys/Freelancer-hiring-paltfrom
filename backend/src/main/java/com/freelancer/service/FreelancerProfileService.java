@@ -7,6 +7,7 @@ import com.freelancer.repository.FreelancerProfileRepository;
 import com.freelancer.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,6 +17,7 @@ public class FreelancerProfileService {
     @Autowired private FreelancerProfileRepository profileRepository;
     @Autowired private UserRepository userRepository;
 
+    @Transactional
     public FreelancerProfile createOrUpdateProfile(Long userId, ProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -32,6 +34,9 @@ public class FreelancerProfileService {
         profile.setPhone(request.getPhone());
         profile.setLocation(request.getLocation());
         profile.setHourlyRate(request.getHourlyRate());
+        user.setPhone(request.getPhone());
+        user.setBio(request.getBio());
+        userRepository.save(user);
 
         return profileRepository.save(profile);
     }

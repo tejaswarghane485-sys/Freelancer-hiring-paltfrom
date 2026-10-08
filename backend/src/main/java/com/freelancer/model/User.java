@@ -41,6 +41,12 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Column(name = "phone", length = 20)
+    private String phone;
+
+    @Column(name = "bio", columnDefinition = "TEXT")
+    private String bio;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -59,6 +65,6 @@ public class User {
     }
 
     public enum Role {
-        CLIENT, FREELANCER
+        CLIENT, FREELANCER, ADMIN
     }
 }

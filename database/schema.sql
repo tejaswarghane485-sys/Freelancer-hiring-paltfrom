@@ -14,6 +14,8 @@ CREATE TABLE users (
     email VARCHAR(150) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role ENUM('CLIENT', 'FREELANCER') NOT NULL,
+    phone VARCHAR(20),
+    bio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -50,6 +52,7 @@ CREATE TABLE projects (
     budget DECIMAL(12, 2),
     deadline DATE,
     status ENUM('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CLOSED') DEFAULT 'OPEN',
+    payment_status ENUM('UNPAID', 'PAID') NOT NULL DEFAULT 'UNPAID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE
@@ -71,6 +74,24 @@ CREATE TABLE proposals (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
     FOREIGN KEY (freelancer_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY unique_proposal (project_id, freelancer_id)
+);
+
+-- ============================================================
+-- PAYMENTS TABLE
+-- ============================================================
+CREATE TABLE payments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    project_id BIGINT NOT NULL UNIQUE,
+    client_id BIGINT NOT NULL,
+    freelancer_id BIGINT NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    payment_date TIMESTAMP NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    transaction_id VARCHAR(36) UNIQUE,
+    payment_method VARCHAR(30),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (freelancer_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ============================================================

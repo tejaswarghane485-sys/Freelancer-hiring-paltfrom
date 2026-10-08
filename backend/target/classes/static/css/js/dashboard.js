@@ -58,6 +58,7 @@ function showSection(sectionId) {
         'freelancers':     'Browse Freelancers',
         'proposals':       'View Proposals',
         'hiring':          'Hiring Requests',
+        'payments':        'Payments',
         'my-profile':      'My Profile',
         'browse-projects': 'Browse Projects',
         'my-proposals':    'My Proposals',
@@ -133,6 +134,21 @@ function openModal(id) {
 function closeModal(id) {
     document.getElementById(id)?.classList.add('hidden');
 }
+
+function viewPaymentReceipt(payment, partyLabel, partyName) {
+    document.getElementById('receiptTransactionId').textContent = payment.transactionId || '—';
+    document.getElementById('receiptPartyLabel').textContent = partyLabel;
+    document.getElementById('receiptParty').textContent = partyName || '—';
+    document.getElementById('receiptProject').textContent = payment.projectTitle || '—';
+    document.getElementById('receiptAmount').textContent = formatCurrency(payment.amount);
+    document.getElementById('receiptMethod').textContent = payment.paymentMethod
+        ? paymentMethodLabel(payment.paymentMethod)
+        : '—';
+    document.getElementById('receiptDate').textContent = formatDateTime(payment.paymentDate);
+    document.getElementById('receiptStatus').textContent = payment.status === 'PAID' ? 'SUCCESS' : 'PENDING';
+    openModal('receiptModal');
+}
+
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m => m.classList.add('hidden'));
@@ -259,6 +275,21 @@ function formatDate(dateStr) {
 function formatCurrency(amount) {
     if (amount === null || amount === undefined || amount === '') return 'N/A';
     return '₹' + Number(amount).toLocaleString('en-IN');
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '—';
+    const normalized = /(?:Z|[+-]\d{2}:\d{2})$/i.test(dateStr) ? dateStr : `${dateStr}Z`;
+    const date = new Date(normalized);
+    if (Number.isNaN(date.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(date);
+}
+
+function paymentMethodLabel(method) {
+    return method === 'NET_BANKING' ? 'Net Banking' : method === 'CARD' ? 'Card' : method === 'UPI' ? 'UPI' : '—';
 }
 
 function renderSkillTags(skillsStr) {

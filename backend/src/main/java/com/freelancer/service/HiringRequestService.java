@@ -9,6 +9,7 @@ import com.freelancer.repository.ProjectRepository;
 import com.freelancer.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class HiringRequestService {
     @Autowired private ProjectRepository projectRepository;
     @Autowired private UserRepository userRepository;
 
+    @Transactional
     public HiringRequest sendHiringRequest(Long clientId, HiringRequestDto dto) {
         Project project = projectRepository.findById(dto.getProjectId())
                 .orElseThrow(() -> new RuntimeException("Project not found"));
@@ -48,27 +50,42 @@ public class HiringRequestService {
         hiringRequest.setFreelancer(freelancer);
         hiringRequest.setMessage(dto.getMessage());
         hiringRequest.setStatus(HiringRequest.Status.PENDING);
-
         return hiringRequestRepository.save(hiringRequest);
     }
 
-    public HiringRequest respondToRequest(Long requestId, Long freelancerId, String status) {
+    @Transactional
+    public HiringRequest acceptRequest(Long requestId, Long freelancerId) {
         HiringRequest request = hiringRequestRepository.findById(requestId)
                 .orElseThrow(() -> new RuntimeException("Hiring request not found"));
 
         if (!request.getFreelancer().getId().equals(freelancerId)) {
             throw new RuntimeException("Unauthorized");
         }
-
-        request.setStatus(HiringRequest.Status.valueOf(status.toUpperCase()));
-
-        // If accepted, update project status to IN_PROGRESS
-        if (request.getStatus() == HiringRequest.Status.ACCEPTED) {
-            Project project = request.getProject();
-            project.setStatus(Project.Status.IN_PROGRESS);
-            projectRepository.save(project);
+        if (request.getStatus() != HiringRequest.Status.PENDING) {
+            throw new IllegalArgumentException("Only pending hiring requests can be accepted");
         }
 
+        Project project = projectRepository.findByIdForUpdate(request.getProject().getId())
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        request.setProject(project);
+        request.setClient(project.getClient());
+        request.setStatus(HiringRequest.Status.ACCEPTED);
+        return hiringRequestRepository.save(request);
+    }
+
+    @Transactional
+    public HiringRequest rejectRequest(Long requestId, Long freelancerId) {
+        HiringRequest request = hiringRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Hiring request not found"));
+
+        if (!request.getFreelancer().getId().equals(freelancerId)) {
+            throw new RuntimeException("Unauthorized");
+        }
+        if (request.getStatus() != HiringRequest.Status.PENDING) {
+            throw new IllegalArgumentException("Only pending hiring requests can be rejected");
+        }
+
+        request.setStatus(HiringRequest.Status.REJECTED);
         return hiringRequestRepository.save(request);
     }
 

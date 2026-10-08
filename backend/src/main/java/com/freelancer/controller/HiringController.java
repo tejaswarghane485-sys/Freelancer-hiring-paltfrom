@@ -1,6 +1,7 @@
 package com.freelancer.controller;
 
 import com.freelancer.dto.HiringRequestDto;
+import com.freelancer.dto.HiringRequestResponse;
 import com.freelancer.model.HiringRequest;
 import com.freelancer.service.HiringRequestService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/hiring")
+@RequestMapping("/api/hiring-requests")
 public class HiringController {
 
     @Autowired private HiringRequestService hiringRequestService;
@@ -23,40 +24,54 @@ public class HiringController {
         try {
             Long userId = (Long) httpRequest.getAttribute("userId");
             HiringRequest request = hiringRequestService.sendHiringRequest(userId, dto);
-            return ResponseEntity.ok(request);
+            return ResponseEntity.ok(HiringRequestResponse.from(request));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @PatchMapping("/{id}/respond")
-    public ResponseEntity<?> respond(@PathVariable Long id,
-                                     @RequestBody Map<String, String> body,
-                                     HttpServletRequest httpRequest) {
+    @PutMapping("/{id}/accept")
+    public ResponseEntity<?> accept(@PathVariable Long id, HttpServletRequest httpRequest) {
         try {
             Long userId = (Long) httpRequest.getAttribute("userId");
-            HiringRequest request = hiringRequestService.respondToRequest(id, userId, body.get("status"));
-            return ResponseEntity.ok(request);
+            HiringRequest request = hiringRequestService.acceptRequest(id, userId);
+            return ResponseEntity.ok(HiringRequestResponse.from(request));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/reject")
+    public ResponseEntity<?> reject(@PathVariable Long id, HttpServletRequest httpRequest) {
+        try {
+            Long userId = (Long) httpRequest.getAttribute("userId");
+            HiringRequest request = hiringRequestService.rejectRequest(id, userId);
+            return ResponseEntity.ok(HiringRequestResponse.from(request));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @GetMapping("/received")
-    public ResponseEntity<List<HiringRequest>> getReceivedRequests(HttpServletRequest httpRequest) {
+    public ResponseEntity<List<HiringRequestResponse>> getReceivedRequests(HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
-        return ResponseEntity.ok(hiringRequestService.getRequestsForFreelancer(userId));
+        return ResponseEntity.ok(hiringRequestService.getRequestsForFreelancer(userId).stream()
+                .map(HiringRequestResponse::from)
+                .toList());
     }
 
     @GetMapping("/sent")
-    public ResponseEntity<List<HiringRequest>> getSentRequests(HttpServletRequest httpRequest) {
+    public ResponseEntity<List<HiringRequestResponse>> getSentRequests(HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
-        return ResponseEntity.ok(hiringRequestService.getRequestsByClient(userId));
+        return ResponseEntity.ok(hiringRequestService.getRequestsByClient(userId).stream()
+                .map(HiringRequestResponse::from)
+                .toList());
     }
 
     @GetMapping("/project/{projectId}")
-    public ResponseEntity<List<HiringRequest>> getRequestsForProject(@PathVariable Long projectId) {
-        return ResponseEntity.ok(hiringRequestService.getRequestsForProject(projectId));
+    public ResponseEntity<List<HiringRequestResponse>> getRequestsForProject(@PathVariable Long projectId) {
+        return ResponseEntity.ok(hiringRequestService.getRequestsForProject(projectId).stream()
+                .map(HiringRequestResponse::from)
+                .toList());
     }
 }
-

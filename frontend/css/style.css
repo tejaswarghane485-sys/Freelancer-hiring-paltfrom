@@ -241,6 +241,8 @@ a:hover { text-decoration: underline; }
 .status-PENDING     { background: #fef3c7; color: #92400e; }
 .status-ACCEPTED    { background: #d1fae5; color: #065f46; }
 .status-REJECTED    { background: #fee2e2; color: #991b1b; }
+.status-paid        { background: #d1fae5; color: #065f46; }
+.status-pending     { background: #fef3c7; color: #92400e; }
 
 /* ── Spinner ─────────────────────────────────────────────── */
 .spinner {

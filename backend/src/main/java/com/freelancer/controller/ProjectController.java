@@ -77,6 +77,17 @@ public class ProjectController {
         }
     }
 
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<?> submitWork(@PathVariable Long id, HttpServletRequest httpRequest) {
+        try {
+            Long userId = (Long) httpRequest.getAttribute("userId");
+            Project project = projectService.submitWork(id, userId);
+            return ResponseEntity.ok(project);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteProject(@PathVariable Long id, HttpServletRequest httpRequest) {
         try {
@@ -100,4 +111,3 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.getOpenProjects());
     }
 }
-

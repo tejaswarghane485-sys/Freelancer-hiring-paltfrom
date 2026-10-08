@@ -5,6 +5,8 @@
    ============================================================ */
 
 const clientUserId = parseInt(sessionStorage.getItem('userId'));
+let clientPaymentRecords = [];
+let selectedPaymentProjectId = null;
 
 // ============================================================
 // INIT
@@ -24,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadMyProjects(),
         loadAllFreelancers(),
         loadClientHiring(),
+        loadClientPayments(),
         populateProjectSelect(),
     ]);
 });
@@ -97,25 +100,31 @@ async function loadMyProjects() {
 }
 
 function projectCard(project, context) {
+    const projectActions = project.status === 'SUBMITTED'
+        ? `<button class="btn btn-success btn-sm" onclick="updateProjectStatus(${project.id}, 'COMPLETED')">Complete</button>`
+        : '';
     const manageActions = context === 'manage' ? `
         <div class="proposal-actions" style="margin-top:14px">
             <button class="btn btn-outline btn-sm"  onclick="viewProjectProposals(${project.id})">📝 Proposals</button>
             <button class="btn btn-outline btn-sm"  onclick="openEditProjectModal(${project.id})">✏️ Edit</button>
-            <select class="status-select" onchange="updateProjectStatus(${project.id}, this.value)">
-                <option value="">Change Status</option>
-                <option value="OPEN"        ${project.status === 'OPEN'        ? 'selected':''}>Open</option>
-                <option value="IN_PROGRESS" ${project.status === 'IN_PROGRESS' ? 'selected':''}>In Progress</option>
-                <option value="COMPLETED"   ${project.status === 'COMPLETED'   ? 'selected':''}>Completed</option>
-                <option value="CLOSED"      ${project.status === 'CLOSED'      ? 'selected':''}>Closed</option>
+            <select class="status-select" aria-label="Change project status"
+                    onchange="updateProjectStatus(${project.id}, this.value, this)">
+                ${project.status === 'SUBMITTED' ? '<option value="SUBMITTED" selected disabled>Submitted</option>' : ''}
+                <option value="" disabled ${['OPEN', 'IN_PROGRESS', 'COMPLETED', 'CLOSED', 'SUBMITTED'].includes(project.status) ? '' : 'selected'}>Change Status</option>
+                <option value="OPEN" ${project.status === 'OPEN' ? 'selected' : ''}>Open</option>
+                <option value="IN_PROGRESS" ${project.status === 'IN_PROGRESS' ? 'selected' : ''}>In Progress</option>
+                <option value="COMPLETED" ${project.status === 'COMPLETED' ? 'selected' : ''}>Completed</option>
+                <option value="CLOSED" ${project.status === 'CLOSED' ? 'selected' : ''}>Closed</option>
             </select>
+            ${projectActions}
             <button class="btn btn-danger btn-sm" onclick="deleteProject(${project.id})">🗑 Delete</button>
         </div>` : '';
 
     return `
-    <div class="project-card">
+    <div class="project-card" data-project-id="${project.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">
             <h3 class="card-title" style="margin:0">${escHtml(project.title)}</h3>
-            ${statusBadge(project.status)}
+            <span class="project-status-badge">${statusBadge(project.status)}</span>
         </div>
         <div class="card-meta">
             <span>💰 ${formatCurrency(project.budget)}</span>
@@ -161,7 +170,7 @@ async function saveEditedProject() {
         });
         closeModal('editProjectModal');
         toast('Project updated successfully!');
-        await Promise.all([loadMyProjects(), loadOverview()]);
+        await Promise.all([loadMyProjects(), loadOverview(), populateProjectSelect()]);
     } catch (err) {
         showInlineAlert('editProjectAlert', err.message, 'error');
     } finally {
@@ -169,14 +178,19 @@ async function saveEditedProject() {
     }
 }
 
-async function updateProjectStatus(projectId, status) {
+async function updateProjectStatus(projectId, status, selectElement) {
     if (!status) return;
+    if (selectElement) selectElement.disabled = true;
     try {
-        await Projects.updateStatus(projectId, status);
+        const project = await Projects.updateStatus(projectId, status);
+        const updatedStatus = project?.status || status;
+        const badge = document.querySelector(`.project-card[data-project-id="${projectId}"] .project-status-badge`);
+        if (badge) badge.innerHTML = statusBadge(updatedStatus);
         toast('Project status updated');
         await Promise.all([loadMyProjects(), loadOverview()]);
     } catch (err) {
         toast(err.message, 'error');
+        await loadMyProjects();
     }
 }
 
@@ -360,7 +374,7 @@ async function loadProposalsForProject(projectId) {
             return;
         }
         el.innerHTML = proposals.map(prop => `
-        <div class="proposal-card">
+        <div class="proposal-card" data-proposal-id="${prop.id}">
             <div style="flex:1">
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
                     <span class="card-title" style="margin:0">${escHtml(prop.freelancer?.fullName || 'Freelancer')}</span>
@@ -392,8 +406,25 @@ async function updateProposal(proposalId, status, projectId) {
     if (!confirm(`${status === 'ACCEPTED' ? 'Accept' : 'Reject'} this proposal?`)) return;
     try {
         await Proposals.updateStatus(proposalId, status);
-        toast(`Proposal ${status.toLowerCase()}`);
-        await loadProposalsForProject(projectId);
+        if (status === 'ACCEPTED') {
+            const card = document.querySelector(`[data-proposal-id="${proposalId}"]`);
+            const badge = card?.querySelector('.badge');
+            if (badge) {
+                badge.classList.remove('status-PENDING');
+                badge.classList.add('status-ACCEPTED');
+                badge.textContent = 'ACCEPTED';
+            }
+            card?.querySelector('.proposal-actions')?.remove();
+            toast('Proposal accepted successfully');
+        } else {
+            toast('Proposal rejected');
+        }
+        await Promise.all([
+            loadProposalsForProject(projectId),
+            loadMyProjects(),
+            loadOverview(),
+            loadClientPayments(),
+        ]);
     } catch (err) {
         toast(err.message, 'error');
     }
@@ -441,5 +472,103 @@ async function loadClientHiring() {
         </div>`).join('');
     } catch (err) {
         console.error('Hiring error:', err);
+    }
+}
+
+async function loadClientPayments() {
+    const el = document.getElementById('clientPaymentsList');
+    if (!el) return;
+    el.innerHTML = buildSkeletonList(2);
+    try {
+        const payments = await Payments.getClientTransactions();
+        clientPaymentRecords = payments;
+        if (!payments.length) {
+            el.innerHTML = emptyState('💳', 'Accepted projects with payments will appear here.');
+            return;
+        }
+        el.innerHTML = `
+            <table class="payments-table">
+                <thead><tr>
+                    <th>Transaction ID</th>
+                    <th>Project Title</th>
+                    <th>Freelancer</th>
+                    <th>Amount</th>
+                    <th>Payment Date &amp; Time</th>
+                    <th>Payment Method</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr></thead>
+                <tbody>${payments.map(payment => `
+                    <tr>
+                        <td class="payment-transaction-id">${escHtml(payment.transactionId || '—')}</td>
+                        <td class="payment-project-name">${escHtml(payment.projectTitle || 'Project')}</td>
+                        <td>${escHtml(payment.freelancerName || 'Freelancer')}</td>
+                        <td class="payment-amount">${formatCurrency(payment.amount)}</td>
+                        <td>${formatDateTime(payment.paymentDate)}</td>
+                        <td>${payment.paymentMethod ? paymentMethodLabel(payment.paymentMethod) : '—'}</td>
+                        <td>${payment.status === 'PAID'
+                            ? '<span class="payment-status-badge is-paid">Paid · Completed</span>'
+                            : payment.status === 'REFUNDED'
+                                ? `<span class="payment-status-badge is-refunded">Refunded · ${escHtml(formatDateTime(payment.refundDate))}</span>`
+                                : '<span class="payment-status-badge is-pending">Pending</span>'}</td>
+                        <td class="payment-actions">${payment.status === 'PAID'
+                            ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>
+                               <button class="btn btn-outline btn-sm" onclick="requestClientPaymentRefund(${payment.projectId})">Request Refund</button>`
+                            : payment.status === 'REFUNDED'
+                                ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>`
+                                : `<button class="btn btn-primary btn-sm pay-now-btn" onclick="openProjectPayment(${payment.projectId})">Pay Now</button>`}</td>
+                    </tr>`).join('')}</tbody>
+            </table>`;
+    } catch (err) {
+        el.innerHTML = emptyState('⚠️', 'Could not load payments.');
+        console.error('Payments error:', err);
+    }
+}
+
+function openProjectPayment(projectId) {
+    const payment = clientPaymentRecords.find(record => record.projectId === projectId);
+    if (!payment) return;
+    selectedPaymentProjectId = projectId;
+    document.getElementById('paymentProjectTitle').textContent = payment.projectTitle || 'Project';
+    document.getElementById('paymentAmount').textContent = formatCurrency(payment.amount);
+    document.getElementById('paymentMethodSelect').value = 'UPI';
+    openModal('paymentModal');
+}
+
+function viewClientPaymentReceipt(projectId) {
+    const payment = clientPaymentRecords.find(record => record.projectId === projectId);
+    if (payment) viewPaymentReceipt(payment, 'Paid To', payment.freelancerName);
+}
+
+async function requestClientPaymentRefund(projectId) {
+    const payment = clientPaymentRecords.find(record => record.projectId === projectId);
+    if (!payment || payment.status !== 'PAID') return;
+    if (!confirm(`Request a refund for "${payment.projectTitle}"?`)) return;
+
+    try {
+        await Payments.refund(projectId, payment.transactionId);
+        toast('Refund processed successfully.');
+        await Promise.all([loadClientPayments(), loadMyProjects(), loadOverview()]);
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function confirmProjectPayment() {
+    if (!selectedPaymentProjectId) return;
+    const button = document.getElementById('confirmPaymentBtn');
+    button.disabled = true;
+    button.textContent = 'Processing…';
+    try {
+        await Payments.pay(selectedPaymentProjectId, document.getElementById('paymentMethodSelect').value);
+        closeModal('paymentModal');
+        selectedPaymentProjectId = null;
+        toast('Payment Successful!');
+        await Promise.all([loadClientPayments(), loadMyProjects(), loadOverview()]);
+    } catch (err) {
+        toast(err.message, 'error');
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Pay Now';
     }
 }

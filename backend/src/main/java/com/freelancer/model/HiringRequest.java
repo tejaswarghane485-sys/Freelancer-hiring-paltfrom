@@ -40,7 +40,7 @@ public class HiringRequest {
     private String message;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50, columnDefinition = "varchar(50) not null default 'PENDING'")
     private Status status = Status.PENDING;
 
     @Column(name = "created_at", updatable = false)
@@ -51,6 +51,7 @@ public class HiringRequest {
 
     @PrePersist
     protected void onCreate() {
+        status = Status.PENDING;
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }

@@ -3,6 +3,7 @@ package com.freelancer.controller;
 import com.freelancer.dto.AuthRequest;
 import com.freelancer.dto.AuthResponse;
 import com.freelancer.dto.RegisterRequest;
+import com.freelancer.dto.ResetPasswordRequest;
 import com.freelancer.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,5 +37,14 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-}
 
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        try {
+            authService.resetPassword(request);
+            return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+}
