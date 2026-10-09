@@ -322,7 +322,9 @@ async function loadMyProposals() {
             <div style="flex:1">
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
                     <span class="card-title" style="margin:0">${escHtml(prop.project?.title || 'Project')}</span>
-                    ${statusBadge(prop.status)}
+                    ${prop.status === 'REJECTED'
+                        ? '<span class="badge status-REJECTED">Proposal Rejected</span>'
+                        : statusBadge(prop.status)}
                     ${prop.project?.status === 'SUBMITTED' ? statusBadge(prop.project.status) : ''}
                 </div>
                 <div class="card-meta">
@@ -536,20 +538,66 @@ async function loadFreelancerPayments() {
                         <td>${escHtml(payment.clientName || 'Client')}</td>
                         <td>${formatDateTime(payment.paymentDate)}</td>
                         <td>${payment.paymentMethod ? paymentMethodLabel(payment.paymentMethod) : '—'}</td>
-                        <td class="payment-amount">${payment.status === 'REFUNDED' ? '−' : ''}${formatCurrency(payment.amount)}</td>
+                        <td class="payment-amount">
+                                ${formatCurrency(payment.amount)}
+                                ${Number(payment.refundedAmount || 0) > 0
+                                    ? `<div>Refunded: −${formatCurrency(payment.refundedAmount)}</div>`
+                                    : ''}
+                        </td>
                         <td>${payment.status === 'PAID'
-                            ? '<span class="payment-status-badge is-paid">Paid · Completed</span>'
-                            : payment.status === 'REFUNDED'
-                                ? `<span class="payment-status-badge is-refunded">Refunded · ${escHtml(formatDateTime(payment.refundDate))}</span>`
+                                ? '<span class="payment-status-badge is-paid">Paid · Completed</span>'
+                                : payment.status === 'REFUND_REQUESTED'
+                                    ? `<span class="payment-status-badge is-pending">Refund requested · ${formatCurrency(payment.requestedRefundAmount)}</span>`
+                                    : payment.status === 'REFUNDED_PARTIALLY'
+                                        ? `<span class="payment-status-badge is-refunded">Partially refunded · ${formatCurrency(payment.refundedAmount)}</span>`
+                                        : payment.status === 'REFUND_SETTLED' || payment.status === 'REFUNDED'
+                                            ? `<span class="payment-status-badge is-refunded">Refund settled · ${escHtml(formatDateTime(payment.refundDate))}</span>`
                                 : '<span class="payment-status-badge is-pending">Pending</span>'}</td>
-                        <td class="payment-actions">${payment.status === 'PAID' || payment.status === 'REFUNDED'
-                            ? `<button class="btn btn-outline btn-sm" onclick="viewFreelancerPaymentReceipt(${payment.projectId})">View Receipt</button>`
-                            : '<span class="payment-action-placeholder">Awaiting payment</span>'}</td>
+                        <td class="payment-actions">${payment.status === 'REFUND_REQUESTED'
+                                ? `<label for="refund-amount-${payment.projectId}">Refund Amount</label>
+                                   <input id="refund-amount-${payment.projectId}" type="number" min="0.01" step="0.01"
+                                          max="${(Number(payment.amount) - Number(payment.refundedAmount || 0)).toFixed(2)}"
+                                          value="${Number(payment.requestedRefundAmount || (Number(payment.amount) - Number(payment.refundedAmount || 0))).toFixed(2)}"
+                                          aria-label="Refund Amount for ${escHtml(payment.projectTitle || 'Project')}">
+                                   <button class="btn btn-primary btn-sm" onclick="submitFreelancerRefund(${payment.projectId})">Submit Refund</button>
+                                   <button class="btn btn-danger btn-sm" onclick="rejectFreelancerRefund(${payment.projectId})">Reject Refund</button>`
+                                : payment.status === 'PAID' || payment.status === 'REFUNDED_PARTIALLY'
+                                ? `<button class="btn btn-outline btn-sm" onclick="viewFreelancerPaymentReceipt(${payment.projectId})">View Receipt</button>`
+                                : payment.status === 'REFUND_SETTLED' || payment.status === 'REFUNDED'
+                                    ? `<button class="btn btn-outline btn-sm" onclick="viewFreelancerPaymentReceipt(${payment.projectId})">View Receipt</button>`
+                                : '<span class="payment-action-placeholder">Awaiting payment</span>'}</td>
                     </tr>`).join('')}</tbody>
             </table>`;
     } catch (err) {
         el.innerHTML = emptyState('⚠️', 'Could not load payment history.');
         console.error('Payment history error:', err);
+    }
+}
+
+async function submitFreelancerRefund(projectId) {
+    const input = document.getElementById(`refund-amount-${projectId}`);
+    const amount = input ? Number(input.value) : NaN;
+    if (!Number.isFinite(amount) || amount <= 0) {
+        toast('Enter a valid refund amount.', 'error');
+        return;
+    }
+    try {
+        await Payments.submitRefund(projectId, amount);
+        toast('Refund submitted to the client.');
+        await Promise.all([loadFreelancerPayments(), loadFreelancerOverview()]);
+    } catch (err) {
+        toast(err.message, 'error');
+    }
+}
+
+async function rejectFreelancerRefund(projectId) {
+    if (!confirm('Reject this refund request?')) return;
+    try {
+        await Payments.rejectRefund(projectId);
+        toast('Refund request rejected.');
+        await Promise.all([loadFreelancerPayments(), loadFreelancerOverview()]);
+    } catch (err) {
+        toast(err.message, 'error');
     }
 }
 

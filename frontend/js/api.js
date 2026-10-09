@@ -147,8 +147,17 @@ const Payments = {
         method: 'POST',
         body: JSON.stringify({ projectId, paymentMethod }),
     }),
-    refund: (projectId, transactionId) => apiCall('/payments/refund', {
+    refund: (projectId, transactionId, requestedAmount) => apiCall('/payments/refund', {
         method: 'POST',
-        body: JSON.stringify(transactionId ? { transactionId } : { projectId }),
+        body: JSON.stringify(transactionId
+            ? { transactionId, requestedAmount }
+            : { projectId, requestedAmount }),
+    }),
+    submitRefund: (projectId, amount) => apiCall(`/payments/${projectId}/refund/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+    }),
+    rejectRefund: (projectId) => apiCall(`/payments/${projectId}/refund/reject`, {
+        method: 'POST',
     }),
 };

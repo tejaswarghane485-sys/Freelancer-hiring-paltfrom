@@ -406,19 +406,15 @@ async function updateProposal(proposalId, status, projectId) {
     if (!confirm(`${status === 'ACCEPTED' ? 'Accept' : 'Reject'} this proposal?`)) return;
     try {
         await Proposals.updateStatus(proposalId, status);
-        if (status === 'ACCEPTED') {
-            const card = document.querySelector(`[data-proposal-id="${proposalId}"]`);
-            const badge = card?.querySelector('.badge');
-            if (badge) {
-                badge.classList.remove('status-PENDING');
-                badge.classList.add('status-ACCEPTED');
-                badge.textContent = 'ACCEPTED';
-            }
-            card?.querySelector('.proposal-actions')?.remove();
-            toast('Proposal accepted successfully');
-        } else {
-            toast('Proposal rejected');
+        const card = document.querySelector(`[data-proposal-id="${proposalId}"]`);
+        const badge = card?.querySelector('.badge');
+        if (badge) {
+            badge.classList.remove('status-PENDING');
+            badge.classList.add(`status-${status}`);
+            badge.textContent = status;
         }
+        card?.querySelector('.proposal-actions')?.remove();
+        toast(status === 'ACCEPTED' ? 'Proposal accepted successfully' : 'Proposal rejected');
         await Promise.all([
             loadProposalsForProject(projectId),
             loadMyProjects(),
@@ -508,15 +504,22 @@ async function loadClientPayments() {
                         <td>${payment.paymentMethod ? paymentMethodLabel(payment.paymentMethod) : '—'}</td>
                         <td>${payment.status === 'PAID'
                             ? '<span class="payment-status-badge is-paid">Paid · Completed</span>'
-                            : payment.status === 'REFUNDED'
-                                ? `<span class="payment-status-badge is-refunded">Refunded · ${escHtml(formatDateTime(payment.refundDate))}</span>`
+                                : payment.status === 'REFUND_REQUESTED'
+                                    ? `<span class="payment-status-badge is-pending">Refund requested · ${formatCurrency(payment.requestedRefundAmount)}</span>`
+                                    : payment.status === 'REFUNDED_PARTIALLY'
+                                        ? `<span class="payment-status-badge is-refunded">Partially refunded · ${formatCurrency(payment.refundedAmount)}</span>`
+                                        : payment.status === 'REFUND_SETTLED' || payment.status === 'REFUNDED'
+                                            ? `<span class="payment-status-badge is-refunded">Refunded · ${escHtml(formatDateTime(payment.refundDate))}</span>`
                                 : '<span class="payment-status-badge is-pending">Pending</span>'}</td>
                         <td class="payment-actions">${payment.status === 'PAID'
-                            ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>
-                               <button class="btn btn-outline btn-sm" onclick="requestClientPaymentRefund(${payment.projectId})">Request Refund</button>`
-                            : payment.status === 'REFUNDED'
-                                ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>`
-                                : `<button class="btn btn-primary btn-sm pay-now-btn" onclick="openProjectPayment(${payment.projectId})">Pay Now</button>`}</td>
+                                ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>
+                                   <button class="btn btn-outline btn-sm" onclick="requestClientPaymentRefund(${payment.projectId})">Request Refund</button>`
+                                : payment.status === 'REFUNDED_PARTIALLY'
+                                    ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>
+                                       <button class="btn btn-outline btn-sm" onclick="requestClientPaymentRefund(${payment.projectId})">Request Remaining Refund</button>`
+                                : payment.status === 'REFUND_REQUESTED' || payment.status === 'REFUND_SETTLED' || payment.status === 'REFUNDED'
+                                    ? `<button class="btn btn-outline btn-sm" onclick="viewClientPaymentReceipt(${payment.projectId})">View Receipt</button>`
+                                    : `<button class="btn btn-primary btn-sm pay-now-btn" onclick="openProjectPayment(${payment.projectId})">Pay Now</button>`}</td>
                     </tr>`).join('')}</tbody>
             </table>`;
     } catch (err) {
@@ -542,12 +545,16 @@ function viewClientPaymentReceipt(projectId) {
 
 async function requestClientPaymentRefund(projectId) {
     const payment = clientPaymentRecords.find(record => record.projectId === projectId);
-    if (!payment || payment.status !== 'PAID') return;
-    if (!confirm(`Request a refund for "${payment.projectTitle}"?`)) return;
+    if (!payment || !['PAID', 'REFUNDED_PARTIALLY'].includes(payment.status)) return;
+    const remainingAmount = Number(payment.amount) - Number(payment.refundedAmount || 0);
+    const requestAmount = prompt(
+        `Enter the refund amount requested for "${payment.projectTitle}" (up to ${formatCurrency(remainingAmount)}).`,
+        remainingAmount.toFixed(2));
+    if (requestAmount === null) return;
 
     try {
-        await Payments.refund(projectId, payment.transactionId);
-        toast('Refund processed successfully.');
+        await Payments.refund(projectId, payment.transactionId, requestAmount);
+        toast('Refund request sent to the freelancer.');
         await Promise.all([loadClientPayments(), loadMyProjects(), loadOverview()]);
     } catch (err) {
         toast(err.message, 'error');

@@ -170,4 +170,28 @@ class ProposalServiceTest {
         assertEquals(Project.Status.IN_PROGRESS, project.getStatus());
         verify(paymentService).createPendingInvoice(project, freelancer, new BigDecimal("450.00"));
     }
+
+    @Test
+    void rejectingAProposalReopensProject() {
+        User owner = new User();
+        owner.setId(4L);
+        Project project = new Project();
+        project.setId(20L);
+        project.setClient(owner);
+        project.setStatus(Project.Status.IN_PROGRESS);
+        Proposal proposal = new Proposal();
+        proposal.setId(30L);
+        proposal.setProject(project);
+        proposal.setStatus(Proposal.Status.PENDING);
+
+        when(proposalRepository.findById(30L)).thenReturn(Optional.of(proposal));
+        when(projectRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(project));
+        when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Proposal result = proposalService.updateProposalStatus(30L, 4L, "rejected");
+
+        assertEquals(Proposal.Status.REJECTED, result.getStatus());
+        assertEquals(Project.Status.OPEN, project.getStatus());
+        verify(projectRepository).save(project);
+    }
 }

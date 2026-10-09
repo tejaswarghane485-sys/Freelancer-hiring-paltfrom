@@ -105,6 +105,14 @@ public class ProposalService {
         } else if (previousStatus == Proposal.Status.ACCEPTED) {
             paymentService.removePendingInvoice(project.getId(), proposal.getFreelancer().getId());
             savedProposal = proposalRepository.save(proposal);
+            if (newStatus == Proposal.Status.REJECTED) {
+                project.setStatus(Project.Status.OPEN);
+                projectRepository.save(project);
+            }
+        } else if (newStatus == Proposal.Status.REJECTED) {
+            savedProposal = proposalRepository.save(proposal);
+            project.setStatus(Project.Status.OPEN);
+            projectRepository.save(project);
         } else {
             savedProposal = proposalRepository.save(proposal);
         }

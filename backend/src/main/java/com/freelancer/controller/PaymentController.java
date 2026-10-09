@@ -3,6 +3,7 @@ package com.freelancer.controller;
 import com.freelancer.dto.PayProjectRequest;
 import com.freelancer.dto.FreelancerEarningsResponse;
 import com.freelancer.dto.RefundPaymentRequest;
+import com.freelancer.dto.RefundDecisionRequest;
 import com.freelancer.dto.PaymentTransactionResponse;
 import com.freelancer.service.PaymentService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,7 +52,7 @@ public class PaymentController {
     @PostMapping("/{projectId}/refund")
     public ResponseEntity<Object> refund(@PathVariable long projectId,
                                          HttpServletRequest request) {
-        return refund(new RefundPaymentRequest(projectId, null), request);
+        return refund(new RefundPaymentRequest(projectId, null, null), request);
     }
 
     @PostMapping("/refund")
@@ -60,7 +61,29 @@ public class PaymentController {
         try {
             Long userId = (Long) request.getAttribute(USER_ID_ATTRIBUTE);
             return ResponseEntity.ok(paymentService.refund(
-                    userId, payment.projectId(), payment.transactionId()));
+                    userId, payment.getProjectId(), payment.getTransactionId(), payment.getRequestedAmount()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{projectId}/refund/submit")
+    public ResponseEntity<Object> submitRefund(@PathVariable long projectId,
+                                               @RequestBody RefundDecisionRequest refund,
+                                               HttpServletRequest request) {
+        try {
+            Long userId = (Long) request.getAttribute(USER_ID_ATTRIBUTE);
+            return ResponseEntity.ok(paymentService.submitRefund(userId, projectId, refund.amount()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{projectId}/refund/reject")
+    public ResponseEntity<Object> rejectRefund(@PathVariable long projectId, HttpServletRequest request) {
+        try {
+            Long userId = (Long) request.getAttribute(USER_ID_ATTRIBUTE);
+            return ResponseEntity.ok(paymentService.rejectRefund(userId, projectId));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

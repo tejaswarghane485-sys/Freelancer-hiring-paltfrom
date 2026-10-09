@@ -15,7 +15,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -45,9 +44,11 @@ public class PaymentService {
                 .map(this::toResponse)
                 .toList();
         BigDecimal totalEarnings = payments.stream()
-                .filter(payment -> "PAID".equals(payment.status()))
-                .map(PaymentTransactionResponse::amount)
-                .filter(Objects::nonNull)
+                .filter(payment -> !"PENDING".equals(payment.status())
+                        && !"REFUND_SETTLED".equals(payment.status())
+                        && !"REFUNDED".equals(payment.status()))
+                .map(payment -> (payment.amount() == null ? BigDecimal.ZERO : payment.amount()).subtract(
+                        payment.refundedAmount() == null ? BigDecimal.ZERO : payment.refundedAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new FreelancerEarningsResponse(payments, totalEarnings);
     }
@@ -62,7 +63,7 @@ public class PaymentService {
         }
 
         Payment payment = paymentRepository.findByProject_Id(project.getId()).orElseGet(Payment::new);
-        if (payment.getStatus() == Payment.Status.PAID || payment.getStatus() == Payment.Status.REFUNDED) {
+        if (payment.getStatus() != Payment.Status.PENDING) {
             throw new IllegalArgumentException("This project already has payment history");
         }
         payment.setProject(project);
@@ -98,8 +99,7 @@ public class PaymentService {
         }
         Payment payment = paymentRepository.findByProject_Id(project.getId())
                 .orElseThrow(() -> new IllegalArgumentException("No invoice exists for this project"));
-        if (payment.getStatus() == Payment.Status.PAID
-                || payment.getStatus() == Payment.Status.REFUNDED
+        if (payment.getStatus() != Payment.Status.PENDING
                 || project.getPaymentStatus() == Project.PaymentStatus.PAID) {
             throw new IllegalArgumentException("This project has already been paid");
         }
@@ -126,6 +126,12 @@ public class PaymentService {
 
     @Transactional
     public PaymentTransactionResponse refund(long clientId, Long projectId, String transactionId) {
+        return refund(clientId, projectId, transactionId, null);
+    }
+
+    @Transactional
+    public PaymentTransactionResponse refund(long clientId, Long projectId, String transactionId,
+                                             BigDecimal requestedAmount) {
         boolean hasProjectId = projectId != null;
         boolean hasTransactionId = transactionId != null && !transactionId.isBlank();
         if (hasProjectId == hasTransactionId) {
@@ -139,13 +145,85 @@ public class PaymentService {
         if (!payment.getClient().getId().equals(clientId)) {
             throw new IllegalArgumentException("You can only refund payments for your own projects");
         }
-        if (payment.getStatus() != Payment.Status.PAID) {
-            throw new IllegalArgumentException("Only paid transactions can be refunded");
+        if (payment.getStatus() != Payment.Status.PAID
+                && payment.getStatus() != Payment.Status.REFUNDED_PARTIALLY) {
+            throw new IllegalArgumentException("Only paid transactions without a pending refund can be refunded");
         }
 
-        payment.setStatus(Payment.Status.REFUNDED);
-        payment.setRefundDate(LocalDateTime.now(ZoneOffset.UTC));
+        BigDecimal remainingAmount = remainingRefundableAmount(payment);
+        BigDecimal amountToRequest = requestedAmount == null ? remainingAmount : requestedAmount;
+        validateRefundAmount(amountToRequest, remainingAmount);
+        payment.setRequestedRefundAmount(amountToRequest);
+        payment.setStatus(Payment.Status.REFUND_REQUESTED);
         return toResponse(paymentRepository.save(payment));
+    }
+
+    @Transactional
+    public PaymentTransactionResponse submitRefund(long freelancerId, Long projectId, BigDecimal amount) {
+        Payment payment = paymentRepository.findByProjectIdForUpdate(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("No payment exists for this project"));
+        if (!payment.getFreelancer().getId().equals(freelancerId)) {
+            throw new IllegalArgumentException("You can only process refunds for your own projects");
+        }
+        if (payment.getStatus() != Payment.Status.REFUND_REQUESTED) {
+            throw new IllegalArgumentException("This project has no pending refund request");
+        }
+
+        BigDecimal remainingAmount = remainingRefundableAmount(payment);
+        validateRefundAmount(amount, remainingAmount);
+        BigDecimal totalRefunded = refundedAmount(payment).add(amount);
+        payment.setRefundedAmount(totalRefunded);
+        payment.setRequestedRefundAmount(null);
+        payment.setRefundDate(LocalDateTime.now(ZoneOffset.UTC));
+        payment.setStatus(totalRefunded.compareTo(payment.getAmount()) == 0
+                ? Payment.Status.REFUND_SETTLED
+                : Payment.Status.REFUNDED_PARTIALLY);
+        return toResponse(paymentRepository.save(payment));
+    }
+
+    @Transactional
+    public PaymentTransactionResponse rejectRefund(long freelancerId, Long projectId) {
+        Payment payment = paymentRepository.findByProjectIdForUpdate(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("No payment exists for this project"));
+        if (!payment.getFreelancer().getId().equals(freelancerId)) {
+            throw new IllegalArgumentException("You can only process refunds for your own projects");
+        }
+        if (payment.getStatus() != Payment.Status.REFUND_REQUESTED) {
+            throw new IllegalArgumentException("This project has no pending refund request");
+        }
+
+        payment.setRequestedRefundAmount(null);
+        payment.setStatus(refundedAmount(payment).signum() > 0
+                ? Payment.Status.REFUNDED_PARTIALLY
+                : Payment.Status.PAID);
+        return toResponse(paymentRepository.save(payment));
+    }
+
+    private void validateRefundAmount(BigDecimal amount, BigDecimal remainingAmount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Refund amount must be positive");
+        }
+        if (amount.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("Refund amount cannot have more than two decimal places");
+        }
+        if (amount.compareTo(remainingAmount) > 0) {
+            throw new IllegalArgumentException("Refund amount cannot exceed the remaining project payment");
+        }
+    }
+
+    private BigDecimal refundedAmount(Payment payment) {
+        return payment.getRefundedAmount() == null ? BigDecimal.ZERO : payment.getRefundedAmount();
+    }
+
+    private BigDecimal remainingRefundableAmount(Payment payment) {
+        if (payment.getAmount() == null || payment.getAmount().signum() <= 0) {
+            throw new IllegalArgumentException("The payment must have a valid amount before it can be refunded");
+        }
+        BigDecimal remainingAmount = payment.getAmount().subtract(refundedAmount(payment));
+        if (remainingAmount.signum() <= 0) {
+            throw new IllegalArgumentException("No refundable balance remains for this project");
+        }
+        return remainingAmount;
     }
 
     private PaymentTransactionResponse toResponse(Payment payment) {
@@ -157,6 +235,6 @@ public class PaymentService {
                 client.getFullName(), freelancer.getFullName(), payment.getAmount(),
                 payment.getPaymentDate(), payment.getStatus().name(), payment.getTransactionId(),
                 payment.getPaymentMethod() == null ? null : payment.getPaymentMethod().name(),
-                payment.getRefundDate());
+                payment.getRefundDate(), payment.getRequestedRefundAmount(), refundedAmount(payment));
     }
 }

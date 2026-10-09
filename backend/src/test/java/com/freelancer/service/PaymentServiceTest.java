@@ -114,7 +114,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void refundUpdatesPaidTransactionWithoutChangingItsTransactionId() {
+    void refundRequestDoesNotDeductFundsOrChangeItsTransactionId() {
         User client = new User();
         client.setId(5L);
         client.setFullName("Client Name");
@@ -134,11 +134,14 @@ class PaymentServiceTest {
         when(paymentRepository.findByProjectIdForUpdate(20L)).thenReturn(Optional.of(payment));
         when(paymentRepository.save(payment)).thenReturn(payment);
 
-        PaymentTransactionResponse result = paymentService.refund(5L, 20L, null);
+        PaymentTransactionResponse result = paymentService.refund(
+                5L, 20L, null, new BigDecimal("150.00"));
 
-        assertEquals("REFUNDED", result.status());
+        assertEquals("REFUND_REQUESTED", result.status());
         assertEquals("TXN-12345678", result.transactionId());
-        assertTrue(result.refundDate() != null);
+        assertEquals(new BigDecimal("150.00"), result.requestedRefundAmount());
+        assertEquals(BigDecimal.ZERO, result.refundedAmount());
+        assertEquals(null, result.refundDate());
         verify(paymentRepository).save(payment);
     }
 
@@ -167,6 +170,7 @@ class PaymentServiceTest {
         payment.setProject(project);
         payment.setClient(client);
         payment.setFreelancer(freelancer);
+        payment.setAmount(new BigDecimal("450.00"));
         payment.setStatus(Payment.Status.PAID);
         payment.setTransactionId("TXN-12345678");
         when(paymentRepository.findByTransactionIdForUpdate("TXN-12345678"))
@@ -175,8 +179,112 @@ class PaymentServiceTest {
 
         PaymentTransactionResponse result = paymentService.refund(5L, null, " TXN-12345678 ");
 
-        assertEquals("REFUNDED", result.status());
+        assertEquals("REFUND_REQUESTED", result.status());
         verify(paymentRepository).findByTransactionIdForUpdate("TXN-12345678");
+    }
+
+    @Test
+    void freelancerCanSubmitPartialRefundForTheRequestedAmount() {
+        User client = new User();
+        client.setId(5L);
+        client.setFullName("Client Name");
+        User freelancer = new User();
+        freelancer.setId(9L);
+        freelancer.setFullName("Freelancer Name");
+        Project project = new Project();
+        project.setId(20L);
+        project.setTitle("Build a website");
+        Payment payment = new Payment();
+        payment.setProject(project);
+        payment.setClient(client);
+        payment.setFreelancer(freelancer);
+        payment.setAmount(new BigDecimal("450.00"));
+        payment.setRequestedRefundAmount(new BigDecimal("200.00"));
+        payment.setStatus(Payment.Status.REFUND_REQUESTED);
+        when(paymentRepository.findByProjectIdForUpdate(20L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(payment)).thenReturn(payment);
+
+        PaymentTransactionResponse result = paymentService.submitRefund(9L, 20L, new BigDecimal("175.00"));
+
+        assertEquals("REFUNDED_PARTIALLY", result.status());
+        assertEquals(new BigDecimal("175.00"), result.refundedAmount());
+        assertEquals(null, result.requestedRefundAmount());
+        assertTrue(result.refundDate() != null);
+    }
+
+    @Test
+    void finalPartialRefundSettlesPayment() {
+        User client = new User();
+        client.setId(5L);
+        User freelancer = new User();
+        freelancer.setId(9L);
+        Project project = new Project();
+        project.setId(20L);
+        project.setTitle("Build a website");
+        Payment payment = new Payment();
+        payment.setProject(project);
+        payment.setClient(client);
+        payment.setFreelancer(freelancer);
+        payment.setAmount(new BigDecimal("450.00"));
+        payment.setRefundedAmount(new BigDecimal("175.00"));
+        payment.setStatus(Payment.Status.REFUND_REQUESTED);
+        when(paymentRepository.findByProjectIdForUpdate(20L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(payment)).thenReturn(payment);
+
+        PaymentTransactionResponse result = paymentService.submitRefund(9L, 20L, new BigDecimal("275.00"));
+
+        assertEquals("REFUND_SETTLED", result.status());
+        assertEquals(new BigDecimal("450.00"), result.refundedAmount());
+    }
+
+    @Test
+    void refundApprovalRejectsAmountsAboveRemainingBalance() {
+        User client = new User();
+        client.setId(5L);
+        User freelancer = new User();
+        freelancer.setId(9L);
+        Project project = new Project();
+        project.setId(20L);
+        Payment payment = new Payment();
+        payment.setProject(project);
+        payment.setClient(client);
+        payment.setFreelancer(freelancer);
+        payment.setAmount(new BigDecimal("450.00"));
+        payment.setRefundedAmount(new BigDecimal("175.00"));
+        payment.setStatus(Payment.Status.REFUND_REQUESTED);
+        when(paymentRepository.findByProjectIdForUpdate(20L)).thenReturn(Optional.of(payment));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> paymentService.submitRefund(9L, 20L, new BigDecimal("275.01")));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void freelancerCanRejectRefundWithoutChangingPaidAmount() {
+        User client = new User();
+        client.setId(5L);
+        User freelancer = new User();
+        freelancer.setId(9L);
+        Project project = new Project();
+        project.setId(20L);
+        project.setTitle("Build a website");
+        Payment payment = new Payment();
+        payment.setProject(project);
+        payment.setClient(client);
+        payment.setFreelancer(freelancer);
+        payment.setAmount(new BigDecimal("450.00"));
+        payment.setRequestedRefundAmount(new BigDecimal("100.00"));
+        payment.setStatus(Payment.Status.REFUND_REQUESTED);
+        when(paymentRepository.findByProjectIdForUpdate(20L)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(payment)).thenReturn(payment);
+
+        PaymentTransactionResponse result = paymentService.rejectRefund(9L, 20L);
+
+        assertEquals("PAID", result.status());
+        assertEquals(new BigDecimal("450.00"), result.amount());
+        assertEquals(BigDecimal.ZERO, result.refundedAmount());
+        assertEquals(null, result.requestedRefundAmount());
     }
 
     @Test
@@ -237,7 +345,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void freelancerEarningsExcludeRefundedTransactionsFromTotal() {
+    void freelancerEarningsSubtractOnlyRefundsThatWereActuallySettled() {
         User client = new User();
         client.setFullName("Client Name");
         User freelancer = new User();
@@ -262,14 +370,23 @@ class PaymentServiceTest {
         refunded.setAmount(new BigDecimal("150.00"));
         refunded.setStatus(Payment.Status.REFUNDED);
         refunded.setTransactionId("transaction-41");
+        Payment partial = new Payment();
+        partial.setId(42L);
+        partial.setProject(project);
+        partial.setClient(client);
+        partial.setFreelancer(freelancer);
+        partial.setAmount(new BigDecimal("300.00"));
+        partial.setRefundedAmount(new BigDecimal("100.00"));
+        partial.setStatus(Payment.Status.REFUNDED_PARTIALLY);
+        partial.setTransactionId("transaction-42");
 
         when(paymentRepository.findByFreelancer_IdOrderByPaymentDateDesc(9L))
-                .thenReturn(List.of(paid, refunded));
+                .thenReturn(List.of(paid, refunded, partial));
 
         FreelancerEarningsResponse result = paymentService.getFreelancerEarnings(9L);
 
-        assertEquals(new BigDecimal("450.00"), result.totalEarnings());
-        assertEquals(2, result.payments().size());
+        assertEquals(new BigDecimal("650.00"), result.totalEarnings());
+        assertEquals(3, result.payments().size());
         assertEquals("transaction-40", result.payments().get(0).transactionId());
         assertEquals("REFUNDED", result.payments().get(1).status());
     }

@@ -14,6 +14,8 @@ public record PaymentTransactionResponse(
         String status,
         String transactionId,
         String paymentMethod,
-        LocalDateTime refundDate
+        LocalDateTime refundDate,
+        BigDecimal requestedRefundAmount,
+        BigDecimal refundedAmount
 ) {
 }

@@ -18,7 +18,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -48,24 +47,24 @@ class PaymentControllerTest {
     }
 
     @Test
-    void refundByTransactionIdReturnsRefundedPaymentAsJson() throws Exception {
-        LocalDateTime refundDate = LocalDateTime.parse("2026-10-07T17:00:00");
+    void refundByTransactionIdReturnsRefundRequestAsJson() throws Exception {
         PaymentTransactionResponse payment = new PaymentTransactionResponse(
                 1L, 20L, "Project", "Client", "Freelancer", new BigDecimal("450.00"),
-                LocalDateTime.parse("2026-10-06T17:00:00"), "REFUNDED",
-                "TXN-12345678", "CARD", refundDate);
-        when(paymentService.refund(5L, null, "TXN-12345678")).thenReturn(payment);
+                LocalDateTime.parse("2026-10-06T17:00:00"), "REFUND_REQUESTED",
+                "TXN-12345678", "CARD", null, new BigDecimal("150.00"), BigDecimal.ZERO);
+        when(paymentService.refund(5L, null, "TXN-12345678", new BigDecimal("150.00"))).thenReturn(payment);
 
         mockMvc.perform(post("/api/payments/refund")
                         .requestAttr("userId", 5L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"transactionId\":\"TXN-12345678\"}"))
+                        .content("{\"transactionId\":\"TXN-12345678\",\"requestedAmount\":150.00}"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.status").value("REFUND_REQUESTED"))
                 .andExpect(jsonPath("$.transactionId").value("TXN-12345678"))
-                .andExpect(jsonPath("$.refundDate").value("2026-10-07T17:00:00"));
+                .andExpect(jsonPath("$.requestedRefundAmount").value(150.00))
+                .andExpect(jsonPath("$.refundedAmount").value(0));
 
-        verify(paymentService).refund(5L, null, "TXN-12345678");
+        verify(paymentService).refund(5L, null, "TXN-12345678", new BigDecimal("150.00"));
     }
 }

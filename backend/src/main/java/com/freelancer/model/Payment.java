@@ -43,6 +43,13 @@ public class Payment {
     @Column(name = "refund_date")
     private LocalDateTime refundDate;
 
+    @Column(name = "requested_refund_amount", precision = 12, scale = 2)
+    private BigDecimal requestedRefundAmount;
+
+    @Column(name = "refunded_amount", nullable = false, precision = 12, scale = 2,
+            columnDefinition = "decimal(12,2) not null default 0.00")
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50,
             columnDefinition = "varchar(50) not null default 'PENDING'")
@@ -56,7 +63,7 @@ public class Payment {
     private Method paymentMethod;
 
     public enum Status {
-        PAID, PENDING, REFUNDED
+        PAID, PENDING, REFUND_REQUESTED, REFUNDED_PARTIALLY, REFUND_SETTLED, REFUNDED
     }
 
     public enum Method {
